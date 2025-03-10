@@ -1,0 +1,76 @@
+
+# Methods
+
+## Jensen-Shannon Divergence for Methylation Analysis
+
+Jensen-Shannon Divergence (JSD) is an information-theoretic measure based on Shannon entropy [@Shannon1948] that quantifies the difference between probability distributions. It has been widely used in genomic sequence analysis [@Grosse2002] and was applied to DNA methylation by [@Kartal2020].
+
+We used the method described in [@Kartal2020] to compute JSD from methylation counts across samples. This approach estimates JSD using the plug-in estimator, where probabilities are replaced by observed frequencies. Given read counts for methylated and unmethylated states at each genomic position, the JSD is calculated as:
+
+$$
+D_i = H\left( \sum_j \pi_{ij} P_{ij} \right) - \sum_j \pi_{ij} H(P_{ij})
+$$
+
+where $P_{ij}$ is the estimated probability distribution for sample $j$, and $\pi_{ij}$ is the sample weight based on read coverage:
+
+$$
+P_{ij} = \frac{1}{n_{ij}} \cdot (n_{ij1}, n_{ij2})
+$$
+
+$$
+\pi_{ij} = \frac{n_{ij}}{n_i}
+$$
+
+with $n_{ij}$ as the total read count for sample $j$ at position $i$, and $n_i$ as the total coverage across samples.
+
+To implement this, we adapted the source code from [@Kartal2020] and made minor modifications to optimize it for our dataset. These changes ensured compatibility with our sample structure while preserving the original methodology. The calculations were performed in R, using custom functions to efficiently compute JSD across genomic positions.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Equations
+
+Here is an equation.
+
+\begin{equation} 
+  f\left(k\right) = \binom{n}{k} p^k\left(1-p\right)^{n-k}
+  (\#eq:binom)
+\end{equation} 
+
+You may refer to using `\@ref(eq:binom)`, like see Equation \@ref(eq:binom).
+
+
+## Theorems and proofs
+
+Labeled theorems can be referenced in text using `\@ref(thm:tri)`, for example, check out this smart theorem \@ref(thm:tri).
+
+::: {.theorem #tri}
+For a right triangle, if $c$ denotes the *length* of the hypotenuse
+and $a$ and $b$ denote the lengths of the **other** two sides, we have
+$$a^2 + b^2 = c^2$$
+:::
+
+Read more here <https://bookdown.org/yihui/bookdown/markdown-extensions-by-bookdown.html>.
+
+## Callout blocks
+
+
+The R Markdown Cookbook provides more help on how to use custom blocks to design your own callouts: https://bookdown.org/yihui/rmarkdown-cookbook/custom-blocks.html
