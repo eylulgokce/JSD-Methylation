@@ -1,0 +1,214 @@
+---
+title: "C"
+output: html_document
+date: "2025-03-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# libs
+```{r, include=FALSE}
+library(rGREAT)
+library(GenomicRanges)
+library(data.table)
+library(dplyr)
+library(clusterProfiler)
+library(org.At.tair.db)
+library(ggplot2)
+library(enrichplot)
+library(GOSemSim)
+library(pheatmap)
+library(tidyr)
+library(KEGGREST)
+```
+
+# paths
+```{r, include = FALSE}
+file_paths <- list(
+  chg = "/Users/eylul/Desktop/JSD-Methylation/data_figs/chg.txt.gz",
+  cpg = "/Users/eylul/Desktop/JSD-Methylation/data_figs/cpg.txt.gz",
+  chh = "/Users/eylul/Desktop/JSD-Methylation/data_figs/chh.txt.gz"
+)
+```
+
+# GO 
+```{r}
+run_GO <- function(gene_list, temperature) {
+  if (length(gene_list) == 0) return(NULL)
+  
+  ego <- enrichGO(
+    gene = gene_list,
+    OrgDb = org.At.tair.db,
+    keyType = "TAIR",
+    ont = "ALL", 
+    pAdjustMethod = "BH",
+    pvalueCutoff = 0.1,
+    qvalueCutoff = 0.1
+  )
+  
+  return(as.data.frame(ego))
+}
+```
+
+# Classify GO 
+```{r}
+classify_go <- function(ego_df, temperature, output_dir) {
+  if (is.null(ego_df) || nrow(ego_df) == 0) return(NULL)
+  
+  ego_df$Category <- factor(ego_df$ONTOLOGY, levels = c("BP", "MF", "CC"))
+  
+  p <- ggplot(ego_df, aes(x = reorder(Description, -p.adjust), y = -log10(p.adjust), fill = Category)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    labs(title = paste("GO Classification for", temperature),
+         x = "GO Term", y = "-log10(p.adjust)", fill = "Category") +
+    theme_minimal()
+  
+  filename <- paste0("GO_Classification_", temperature, ".png")
+  ggsave(file.path(output_dir, filename), p, width = 15, height = 10)
+  
+  return(p)
+}
+```
+
+# Transposable Elements
+```{r}
+analyze_TE_effects <- function(data, temperature) {
+  data$TE_associated <- ifelse(data$class == "transposable_element", "TE", "Non-TE")
+  
+  p <- ggplot(data, aes(x = TE_associated, y = get(paste0("JSD_bit_", temperature)), fill = TE_associated)) +
+    geom_boxplot() +
+    labs(title = paste("TE Influence on JSD at", temperature), x = "Gene Type", y = "JSD") +
+    theme_minimal()
+  
+  return(p)
+}
+```
+
+# Methylation JSD correlation
+```{r}
+correlate_methylation_jsd <- function(data, temperature) {
+  jsd_col <- paste0("JSD_bit_", temperature)
+  meth_col <- paste0("meth_", temperature)
+  
+  correlation <- cor(data[[meth_col]], data[[jsd_col]], use = "complete.obs")
+  return(correlation)
+}
+```
+
+# KEGG Pathways
+```{r}
+identify_kegg <- function(gene_list) {
+  if (length(gene_list) == 0) return(NULL)
+  
+  kegg_res <- enrichKEGG(
+    gene = gene_list,
+    organism = "ath", 
+    keyType = "kegg",
+    pvalueCutoff = 0.05
+  )
+  
+  return(as.data.frame(kegg_res))
+}
+```
+
+# Cluster Genes on divergence
+```{r}
+cluster_genes <- function(data) {
+    jsd_data <- data[, c("JSD_bit_10C", "JSD_bit_16C", "JSD_bit_22C")]
+
+    jsd_data <- data.frame(lapply(jsd_data, as.numeric))
+
+    # Remove rows with any NA, NaN, or Inf values
+    jsd_matrix <- as.matrix(jsd_data)
+    valid_rows <- complete.cases(jsd_data) & rowSums(is.finite(jsd_matrix)) == ncol(jsd_data) & !apply(jsd_data, 1, function(row) any(is.na(row)))
+    jsd_data <- jsd_data[valid_rows, ]
+
+    # Ensure enough data remains
+    if (nrow(jsd_data) < 2) {
+        warning("Not enough data for clustering after removing problematic values.")
+        return(NULL)
+    }
+
+    dist_matrix <- dist(jsd_data, method = "euclidean")
+
+    # Check for NA/NaN/Inf in the distance matrix
+    if (any(!is.finite(dist_matrix))) {
+        warning("Distance matrix contains NA/NaN/Inf values.")
+        return(NULL)
+    }
+
+    clustering <- hclust(dist_matrix, method = "ward.D2")
+
+    return(clustering)
+}
+```
+
+# Heatmap
+```{r}
+visualize_heatmap <- function(data, output_dir) {
+    jsd_cols <- c("JSD_bit_10C", "JSD_bit_16C", "JSD_bit_22C")
+
+    for (col in jsd_cols) {
+        data[[col]] <- as.numeric(data[[col]])
+    }
+
+    valid_rows <- complete.cases(data[, jsd_cols]) & rowSums(is.finite(as.matrix(data[, jsd_cols]))) == length(jsd_cols)
+
+    data <- data[valid_rows, ]
+
+    zero_var_cols <- sapply(jsd_cols, function(col) var(data[[col]], na.rm = TRUE) == 0)
+    if (any(zero_var_cols)) {
+        warning(paste("Columns with zero variance:", paste(jsd_cols[zero_var_cols], collapse = ", ")))
+        warning("Heatmap generation skipped due to zero variance.")
+        return()
+    }
+
+    if (nrow(data) > 1){
+        pheatmap(as.matrix(data[, jsd_cols]),
+                 cluster_rows = TRUE, cluster_cols = TRUE,
+                 main = "Methylation Heatmap")
+        ggsave(file.path(output_dir, "Heatmap.png"))
+    }else{
+        warning("Not enough data to create heatmap.")
+    }
+}
+```
+
+# main 
+```{r}
+for (context in names(file_paths)) {
+  data <- read.table(file_paths[[context]], header = TRUE, sep = "\t")
+  
+  output_dir <- file.path("GO_Enrichment_Plots", context)
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+  
+  temperatures <- c("10C", "16C", "22C")
+  
+  for (temp in temperatures) {
+    jsd_col <- paste0("JSD_bit_", temp)
+    genes <- unique(data$nearestTSS.gene_id[!is.na(data[[jsd_col]])])
+    
+    ego_df <- run_GO(genes, temp)
+    if (!is.null(ego_df) && nrow(ego_df) > 0) {
+      classify_go(ego_df, temp, output_dir)
+    }
+    
+    kegg_df <- identify_kegg(genes)
+    if (!is.null(kegg_df) && nrow(kegg_df) > 0) {
+      write.csv(kegg_df, file.path(output_dir, paste0("KEGG_Pathways_", temp, ".csv")))
+    }
+  }
+  
+  te_effect <- analyze_TE_effects(data, temp)
+  correlation <- correlate_methylation_jsd(data, temp)
+  clustering <- cluster_genes(data)
+  if (!is.null(clustering)) {
+    plot(clustering)
+  }
+  
+  visualize_heatmap(data, output_dir)
+}
+```
