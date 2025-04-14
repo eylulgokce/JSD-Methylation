@@ -1,0 +1,111 @@
+---
+title: "RGREATE"
+output: html_document
+date: "2025-04-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+# libs
+```{r, include=FALSE}
+library(GenomicRanges)
+library(data.table)
+library(dplyr)
+library(clusterProfiler)
+library(org.At.tair.db)
+library(viridis)
+```
+
+
+# paths
+```{r, include = FALSE}
+file_paths <- list(
+  chg = "/Users/eylul/Desktop/JSD-Methylation/data_figs/chg.txt.gz",
+  cpg = "/Users/eylul/Desktop/JSD-Methylation/data_figs/cpg.txt.gz",
+  chh = "/Users/eylul/Desktop/JSD-Methylation/data_figs/chh.txt.gz"
+)
+```
+
+# GO 
+```{r}
+run_GO <- function(gene_list, temperature) {
+  if (length(gene_list) == 0) return(NULL)
+  
+  ego <- enrichGO(
+    gene = gene_list,
+    #universe = background_genes, # context spesific, passing genes
+    OrgDb = org.At.tair.db,
+    keyType = "TAIR",
+    ont = "ALL", 
+    pAdjustMethod = "BH",
+    pvalueCutoff = 0.1,
+    qvalueCutoff = 0.05
+  )
+  
+  return(as.data.frame(ego))
+}
+```
+
+
+```{r}
+
+all_ego_dfs <- list()
+
+
+for (context in names(file_paths)) {
+  data <- read.table(file_paths[[context]], header = TRUE, sep = "\t")
+  
+  output_dir <- file.path("GO_Enrichment_Plots", context)
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+  
+  temperatures <- c("10C", "16C", "22C")
+  
+  for (temp in temperatures) {
+    jsd_col <- paste0("JSD_bit_", temp)
+    
+    genes <- unique(data$nearestTSS.gene_id[!is.na(data[[jsd_col]])])
+    genes <- genes[genes != "" & !is.na(genes)]
+    
+    ego_df <- run_GO(genes, temp)
+    
+
+
+    
+    if (!is.null(ego_df) && nrow(ego_df) > 0) {
+      plot_go_dotplot(ego_df, temp, context, output_dir)
+    } else {
+      message(paste("No GO terms found for", context, "at", temp))
+    }
+  }
+  
+}
+
+
+```
+
+
+# dot plots 
+
+```{r}
+
+plot_go_dotplot <- function(ego_df, temp, context, output_dir) {
+  ego_result <- suppressWarnings(
+    new("enrichResult", result = ego_df, pvalueCutoff = 0.1, 
+        pAdjustMethod = "BH", qvalueCutoff = 0.05)
+  )
+  
+  dotplot_file <- file.path(output_dir, paste0("GO_dotplot_", context, "_", temp, ".pdf"))
+  
+  pdf(dotplot_file, width = 8, height = 6)
+  print(dotplot(ego_result, showCategory = 20, title = paste("Top 20 GO terms -", context, temp)) +
+  scale_color_viridis())
+  dev.off()
+}
+```
+
+
+
