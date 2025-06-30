@@ -45,7 +45,7 @@ run_GO <- function(gene_list, temperature) {
     ont = "ALL", 
     pAdjustMethod = "BH",
     pvalueCutoff = 0.1,
-    qvalueCutoff = 0.1
+    qvalueCutoff = 0.05
   )
   
   return(as.data.frame(ego))

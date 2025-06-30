@@ -1,0 +1,114 @@
+---
+title: "JSDvsMET"
+output: html_document
+date: "2025-03-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+output_dir <- "/Users/eylul/Desktop/JSD-Methylation/great/GREAT-Analysis/plots"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+
+```
+
+```{r}
+p1 <- ggplot(methylation_data, aes(x = meth, y = JSD_bit, color = Temperature)) +
+  geom_point(alpha = 0.6) +
+  facet_wrap(~Context, scales = "free") +
+  theme_minimal() +
+  labs(title = "JSD vs. Methylation Level", x = "Methylation Level", y = "JSD (bits)")
+
+ggsave(file.path(output_dir, "scatter_jsd_vs_methylation.png"), p1)
+```
+
+
+```{r}
+p2 <- ggplot(methylation_data, aes(x = class, y = JSD_bit, fill = class)) +
+  geom_boxplot() +
+  theme_minimal() +
+  facet_wrap(~Context) +
+  labs(title = "JSD in Transposable Elements vs. Genes", x = "Feature Type", y = "JSD (bits)")
+
+ggsave(file.path(output_dir, "boxplot_jsd_TEs_vs_genes.png"), p2)
+```
+
+```{r}
+p3 <- ggplot(methylation_data, aes(x = JSD_bit, fill = class)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~Temperature + Context) +
+  theme_minimal() +
+  labs(title = "Density of JSD Across TEs & Genes")
+
+ggsave(file.path(output_dir, "density_jsd_distribution.png"), p3)
+```
+
+
+```{r}
+methylation_data <- methylation_data %>%
+  mutate(Methylation_Level = ifelse(meth >= median(meth, na.rm = TRUE), "High", "Low"))
+
+p12 <- ggplot(methylation_data, aes(x = Methylation_Level, y = JSD_bit, fill = Methylation_Level)) +
+  geom_boxplot() +
+  facet_wrap(~Temperature + Context) +
+  theme_minimal() +
+  labs(title = "JSD Comparison: High vs. Low Methylation")
+
+ggsave(file.path(output_dir, "boxplot_high_low_methylation.png"), p12)
+```
+
+
+```{r}
+heatmap_data <- methylation_data %>%
+  select(chromosome, location, Temperature, JSD_bit) %>%
+  group_by(chromosome, location) %>%
+  summarise(across(starts_with("JSD"), mean, na.rm = TRUE)) %>%  # Average duplicates
+  unite("chr_loc", chromosome, location, sep = "_") %>%   # Create unique row identifier
+  pivot_wider(names_from = Temperature, values_from = JSD_bit) %>%
+  column_to_rownames(var = "chr_loc") %>%
+  na.omit()
+
+# Convert to matrix
+heatmap_matrix <- as.matrix(heatmap_data)
+
+pheatmap(heatmap_matrix, scale = "row", clustering_distance_rows = "euclidean",
+         clustering_distance_cols = "euclidean", clustering_method = "ward.D2",
+         main = "JSD Clustering Across Temperatures")
+
+ggsave(file.path(output_dir, "heatmap_jsd_clustering.png"))
+```
+
+
+
+```{r}
+library(FactoMineR)
+library(factoextra)
+
+# Select JSD values, remove NA, and sample (if needed)
+pca_data <- methylation_data %>%
+  select(Temperature, JSD_bit) %>%
+  spread(Temperature, JSD_bit) %>%
+  na.omit()
+
+# Limit PCA to 5000 rows if too large
+if (nrow(pca_data) > 5000) {
+  pca_data <- pca_data[sample(1:nrow(pca_data), 5000), ]
+}
+
+# Run PCA
+pca_res <- PCA(pca_data, scale.unit = TRUE, graph = FALSE)
+
+# Plot PCA
+p6 <- fviz_pca_ind(pca_res, geom = "point", col.ind = "black", title = "PCA of JSD Across Temperatures")
+
+ggsave(file.path(output_dir, "pca_jsd_temperatures.png"), p6)
+```
+
+
+
+

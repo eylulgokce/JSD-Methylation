@@ -18,6 +18,9 @@ library(dplyr)
 library(clusterProfiler)
 library(org.At.tair.db)
 library(viridis)
+library(patchwork)
+library(ggplot2)
+
 ```
 
 
@@ -62,7 +65,7 @@ plot_go_dotplot <- function(ego_df, temp, context, output_dir, region_class) {
   
   dotplot_file <- file.path(output_dir, paste0("GO_dotplot_", context, "_", temp, "_", region_class, ".pdf"))
   
-  pdf(dotplot_file, width = 8, height = 6)
+  pdf(dotplot_file, width = 6, height = 4)
   print(dotplot(ego_result, showCategory = 20,
                 title = paste("Top 20 GO terms -", context, temp, "-", region_class)) +
           scale_color_viridis())
@@ -72,41 +75,55 @@ plot_go_dotplot <- function(ego_df, temp, context, output_dir, region_class) {
 ```
 
 ```{r}
-all_ego_dfs <- list()
-
 for (context in names(file_paths)) {
   data <- read.table(file_paths[[context]], header = TRUE, sep = "\t")
   
-  output_dir <- file.path("GO_Enrichment_Plots", context)
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-  
   temperatures <- c("10C", "16C", "22C")
+  region_classes <- unique(data$class)
+  
+  plot_list <- list()  # collect all plots for the context
   
   for (temp in temperatures) {
     jsd_col <- paste0("JSD_bit_", temp)
     
-    # regions loop
-    for (region_class in unique(data$class)) {
+    for (region_class in region_classes) {
       data_class <- data[data$class == region_class, ]
       
-      # gene IDs with JSD value 
       genes <- unique(data_class$nearestTSS.gene_id[!is.na(data_class[[jsd_col]])])
       genes <- genes[genes != "" & !is.na(genes)]
       
       ego_df <- run_GO(genes, temp)
       
       if (!is.null(ego_df) && nrow(ego_df) > 0) {
-        class_output_dir <- file.path(output_dir, region_class)
-        if (!dir.exists(class_output_dir)) dir.create(class_output_dir, recursive = TRUE)
+        ego_result <- suppressWarnings(
+          new("enrichResult", result = ego_df, pvalueCutoff = 0.1, 
+              pAdjustMethod = "BH", qvalueCutoff = 0.05)
+        )
         
-        plot_go_dotplot(ego_df, temp, context, class_output_dir, region_class)
+        p <- dotplot(ego_result, showCategory = 20,
+                     title = paste(context, temp, region_class)) +
+          scale_color_viridis()
+        
+        plot_list[[paste(temp, region_class, sep = "_")]] <- p
       } else {
-        message(paste("No GO terms found for", context, "at", temp, "in class", region_class))
+        message(paste("No GO terms for", context, temp, region_class))
       }
     }
   }
+  
+  if (length(plot_list) > 0) {
+    combined_plot <- wrap_plots(plot_list, ncol = 2)  
+    
+    output_dir <- "GO_Enrichment_Plots"
+    if (!dir.exists(output_dir)) dir.create(output_dir)
+    
+    output_path <- file.path(output_dir, paste0("Combined_GO_", context, ".pdf"))
+    
+    ggsave(output_path, combined_plot, width = 10, height = 6 * ceiling(length(plot_list)/2))
+  } else {
+    message(paste("No GO plots available for context:", context))
+  }
 }
-
 
 
 ```
