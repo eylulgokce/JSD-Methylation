@@ -1,0 +1,6 @@
+label,url
+SRX1664459_se,test_data/SRX1664459_se/CHH_SRX1664459_se.bismark_chr_1.sorted.cov.gz
+SRX1664460_se,test_data/SRX1664460_se/CHH_SRX1664460_se.bismark_chr_1.sorted.cov.gz
+SRX1664461_se,test_data/SRX1664461_se/CHH_SRX1664461_se.bismark_chr_1.sorted.cov.gz
+SRX1664462_se,test_data/SRX1664462_se/CHH_SRX1664462_se.bismark_chr_1.sorted.cov.gz
+SRX1664463_se,test_data/SRX1664463_se/CHH_SRX1664463_se.bismark_chr_1.sorted.cov.gz
