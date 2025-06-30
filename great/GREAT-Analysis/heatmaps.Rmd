@@ -1,0 +1,105 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-05-18"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install(c(
+  "EnrichedHeatmap",
+  "GenomicRanges",
+  "GenomicFeatures",
+  "TxDb.Athaliana.BioMart.plantsmart28"
+))
+install.packages("readr")
+```
+
+
+```{r}
+
+# Load libraries
+library(EnrichedHeatmap)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(TxDb.Athaliana.BioMart.plantsmart28)
+library(tidyverse)
+
+# Load Arabidopsis gene annotations
+txdb <- TxDb.Athaliana.BioMart.plantsmart28
+genes <- genes(txdb)
+
+# Load CHG methylation data
+chg <- readr::read_tsv("/Users/eylul/Desktop/JSD-Methylation/data_figs/chg.txt.gz")
+
+# ---- GRanges for all CHG sites with JSD (10C) ----
+chg_filtered <- chg %>%
+  dplyr::filter(!is.na(JSD_bit_10C)) %>%
+  dplyr::mutate(start = location, end = location) %>%
+  dplyr::select(chromosome, start, end, JSD_bit_10C)
+
+gr_chg <- GRanges(
+  seqnames = chg_filtered$chromosome,
+  ranges = IRanges(start = chg_filtered$start, end = chg_filtered$end),
+  score = chg_filtered$JSD_bit_10C
+)
+
+# ---- EnrichedHeatmap for gene bodies ----
+mat_gene <- normalizeToMatrix(
+  gr_chg, genes,
+  value_column = "score",
+  extend = 1000,       # ±1kb from start/end
+  w = 1,               # 1bp = no binning
+  mean_mode = "absolute",
+  empty_value = NA
+)
+
+pdf("EnrichedHeatmap_CHG_GeneBodies_10C_nobins.pdf", width = 6, height = 6)
+EnrichedHeatmap(
+  mat_gene,
+  name = "JSD (10°C)",
+  top_annotation = HeatmapAnnotation(lines = anno_enriched()),
+  column_title = "CHG JSD around Gene Bodies (10°C, no bins)"
+)
+dev.off()
+
+# ---- EnrichedHeatmap for Transposable Elements (no binning) ----
+te_chg <- chg %>%
+  dplyr::filter(class == "transposable_element", !is.na(JSD_bit_10C)) %>%
+  dplyr::mutate(start = location, end = location) %>%
+  dplyr::select(chromosome, start, end, JSD_bit_10C)
+
+gr_te <- GRanges(
+  seqnames = te_chg$chromosome,
+  ranges = IRanges(start = te_chg$start, end = te_chg$end),
+  score = te_chg$JSD_bit_10C
+)
+
+# Create 2kb windows centered on TE positions
+te_sites <- resize(gr_te, width = 1, fix = "center")
+pseudo_te_regions <- resize(te_sites, width = 2000, fix = "center")
+
+mat_te <- normalizeToMatrix(
+  gr_te, pseudo_te_regions,
+  value_column = "score",
+  extend = 1000,
+  w = 1,
+  mean_mode = "absolute",
+  empty_value = NA
+)
+
+pdf("EnrichedHeatmap_CHG_TE_10C_nobins.pdf", width = 6, height = 6)
+EnrichedHeatmap(
+  mat_te,
+  name = "JSD (10°C)",
+  top_annotation = HeatmapAnnotation(lines = anno_enriched()),
+  column_title = "CHG JSD around TEs (10°C, no bins)"
+)
+dev.off()
+
+```
+

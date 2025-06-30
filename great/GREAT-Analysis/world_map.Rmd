@@ -1,0 +1,434 @@
+---
+title: "world_map"
+output: html_document
+date: "2025-05-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf)
+
+
+column_names <- c("Accession_ID", "Name", "Code", "Country", "Country_short",
+                  "Lat", "Long", "Collector", "Extra", "CS_Number",
+                  "Admixture_Group", "Sequenced_by")
+
+
+
+data <- read_csv("accessions.txt", col_names = FALSE)
+
+colnames(data) <- column_names
+
+# Convert lat/long to numeric
+df <- data %>%
+  mutate(
+    Lat = as.numeric(Lat),
+    Long = as.numeric(Long)
+  )
+
+# Get world basemap
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+
+ggplot(data = world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = data, aes(x = Long, y = Lat),
+             color = "blue", size = 3, alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Sample Collection Map",
+       x = "Longitude", y = "Latitude") +
+  theme(panel.background = element_rect(fill = "lightblue"),
+        panel.grid = element_line(color = "white"))
+
+```
+
+
+```{r}
+
+
+# Load Europe-focused world map
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Plot Europe only
+ggplot(data = world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = data, aes(x = Long, y = Lat),
+             color = "darkblue", size = 2, alpha = 0.7) +
+  coord_sf(xlim = c(-10, 30), ylim = c(35, 65), expand = FALSE) +  # Europe focus
+  theme_minimal() +
+  labs(title = "European Sample Map",
+       x = "Longitude", y = "Latitude") +
+  theme(panel.background = element_rect(fill = "lightblue"),
+        panel.grid = element_line(color = "white"))
+
+
+```
+
+```{r}
+
+library(cowplot)  
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Main: Europe
+plot_europe <- ggplot(data = world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = data, aes(x = Long, y = Lat), color = "blue", size = 2) +
+  coord_sf(xlim = c(-10, 30), ylim = c(35, 65), expand = FALSE) +
+  labs(title = "Europe") +
+  theme_minimal()
+
+# Inset: Asia
+plot_asia <- ggplot(data = world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = data, aes(x = Long, y = Lat), color = "purple", size = 2) +
+  coord_sf(xlim = c(60, 150), ylim = c(10, 60), expand = FALSE) +
+  labs(title = "Asia") +
+  theme_void()
+
+
+# Inset: US
+plot_us <- ggplot(data = world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = data, aes(x = Long, y = Lat), color = "red", size = 2) +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  labs(title = "USA") +
+  theme_void()
+
+# Inset: Japan
+plot_japan <- ggplot(data = world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = data, aes(x = Long, y = Lat), color = "green", size = 2) +
+  coord_sf(xlim = c(128, 146), ylim = c(30, 46), expand = FALSE) +
+  labs(title = "Japan") +
+  theme_void()
+
+
+# Combine all plots
+final_map <- ggdraw() +
+  draw_plot(plot_europe, 0, 0, 1, 1) +             # Main Europe
+  draw_plot(plot_us, 0.03, 0.65, 0.23, 0.23) +     # Top-left inset
+  draw_plot(plot_asia, 0.03, 0.35, 0.23, 0.23)     # Top-center inset
+
+print(final_map)
+
+
+
+```
+
+
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(cowplot)
+library(egg)
+
+# Load world map data
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Load your data
+data <- read_csv("accessions.txt", col_names = FALSE)
+
+# Assign proper column names (adjust if needed)
+colnames(data) <- c(
+  "Accession_ID", "Name", "Code", "Country", "Country_short",
+  "Lat", "Long", "Collector", "Extra", "CS_Number",
+  "Admixture_Group", "Sequenced_by", "Notes" 
+)
+
+
+
+
+# Filter only Asian data points
+asia_data <- data %>%
+  filter(Long > 60, Long < 125, Lat > 10, Lat < 60)
+
+# Calculate zoom range based on those points
+asia_xlim <- range(asia_data$Long, na.rm = TRUE) + c(-2, 2)
+asia_ylim <- range(asia_data$Lat, na.rm = TRUE) + c(-2, 2)
+
+
+
+# North Africa
+africa_data <- data %>%
+  filter(Long > -20, Long < 40, Lat > 10, Lat < 38)
+
+africa_xlim <- range(africa_data$Long, na.rm = TRUE) + c(-2, 2)
+africa_ylim <- range(africa_data$Lat, na.rm = TRUE) + c(-2, 2)
+
+
+# Japan 
+japan_data <- data %>%
+  filter(Long > 128, Long < 146, Lat > 30, Lat < 46)
+
+# USA
+us_data <- data %>%
+  filter(Long < -65, Long > -130, Lat > 24, Lat < 50)
+
+# Europe (main map)
+plot_europe <- ggplot(data = world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = data, aes(x = Long, y = Lat), color = "blue", size = 2) +
+  coord_sf(xlim = c(-10, 30), ylim = c(35, 65), expand = FALSE) +
+  labs(title = "Europe") +
+  theme_minimal()
+
+# USA inset
+plot_us <- ggplot(data = world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = us_data, aes(x = Long, y = Lat), color = "blue", size = 2) +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  labs(title = "USA") +
+  theme_void()
+
+# Asia inset plot 
+plot_asia <- ggplot(data = world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = asia_data, aes(x = Long, y = Lat), color = "blue", size = 2) +
+  coord_sf(xlim = asia_xlim, ylim = asia_ylim, expand = FALSE) +
+  labs(title = "Asia") +
+  theme_void()
+
+
+# Japan inset
+plot_japan <- ggplot(data = world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = japan_data, aes(x = Long, y = Lat), color = "blue", size = 2) +
+  coord_sf(xlim = c(128, 146), ylim = c(30, 46), expand = FALSE) +
+  labs(title = "Japan") +
+  theme_void()
+
+# North Africa inset 
+plot_africa <- ggplot(data = world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = africa_data, aes(x = Long, y = Lat), color = "blue", size = 2) +
+  coord_sf(xlim = africa_xlim, ylim = africa_ylim, expand = FALSE) +
+  labs(title = "North Africa") +
+  theme_void()
+
+### COMBINE INTO FINAL MAP
+
+final_map <- ggdraw() +
+  draw_plot(plot_europe, 0, 0, 1, 1) +            
+  draw_plot(plot_us,     0.01, 0.65, 0.22, 0.22) +  
+  draw_plot(plot_asia,   0.01, 0.30, 0.27, 0.27) + 
+  draw_plot(plot_japan,  0.75, 0.65, 0.27, 0.27) +  
+  draw_plot(plot_africa, 0.80, 0.30, 0.27, 0.27)
+
+
+# Show map
+print(final_map)
+
+ggsave("world_map.png", plot = final_map, width = 12, height = 8, dpi = 300)
+
+```
+
+
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(gridExtra)
+library(egg)
+library(grid)
+
+# Load world map
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Read data
+data <- read_csv("accessions.txt", col_names = FALSE)
+colnames(data) <- c("Accession_ID", "Name", "Code", "Country", "Country_short",
+                    "Lat", "Long", "Collector", "Extra", "CS_Number",
+                    "Admixture_Group", "Sequenced_by", "Notes")
+
+# Regions
+asia_data <- data %>% filter(Long > 60, Long < 125, Lat > 10, Lat < 60)
+africa_data <- data %>% filter(Long > -20, Long < 40, Lat > 10, Lat < 38)
+japan_data <- data %>% filter(Long > 128, Long < 146, Lat > 30, Lat < 46)
+us_data <- data %>% filter(Long < -65, Long > -130, Lat > 24, Lat < 50)
+
+asia_xlim <- range(asia_data$Long, na.rm = TRUE) + c(-2, 2)
+asia_ylim <- range(asia_data$Lat, na.rm = TRUE) + c(-2, 2)
+africa_xlim <- range(africa_data$Long, na.rm = TRUE) + c(-2, 2)
+africa_ylim <- range(africa_data$Lat, na.rm = TRUE) + c(-2, 2)
+
+# Small map theme
+mini_theme <- theme_void(base_size = 8)
+
+# Plots
+plot_europe <- ggplot(world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = data, aes(x = Long, y = Lat), color = "blue", size = 1.6) +
+  coord_sf(xlim = c(-10, 30), ylim = c(35, 65), expand = FALSE) +
+  labs(title = "Europe") +
+  theme_minimal(base_size = 12)
+
+plot_us <- ggplot(world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = us_data, aes(x = Long, y = Lat), color = "blue", size = 1.4) +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  labs(title = "USA") +
+  mini_theme
+
+plot_asia <- ggplot(world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = asia_data, aes(x = Long, y = Lat), color = "blue", size = 1.4) +
+  coord_sf(xlim = asia_xlim, ylim = asia_ylim, expand = FALSE) +
+  labs(title = "Asia") +
+  mini_theme
+
+plot_japan <- ggplot(world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = japan_data, aes(x = Long, y = Lat), color = "blue", size = 1.4) +
+  coord_sf(xlim = c(128, 146), ylim = c(30, 46), expand = FALSE) +
+  labs(title = "Japan") +
+  mini_theme
+
+plot_africa <- ggplot(world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = africa_data, aes(x = Long, y = Lat), color = "blue", size = 1.4) +
+  coord_sf(xlim = africa_xlim, ylim = africa_ylim, expand = FALSE) +
+  labs(title = "North Africa") +
+  mini_theme
+
+# Resize small maps
+p_us     <- set_panel_size(plot_us,     width = unit(6.2, "cm"), height = unit(5.5, "cm"))
+p_asia   <- set_panel_size(plot_asia,   width = unit(6.2, "cm"), height = unit(5.5, "cm"))
+p_japan  <- set_panel_size(plot_japan,  width = unit(6.2, "cm"), height = unit(5.5, "cm"))
+p_africa <- set_panel_size(plot_africa, width = unit(6.2, "cm"), height = unit(5.5, "cm"))
+
+# Arrange small plots into a row
+small_row <- grid.arrange(p_us, p_asia, p_japan, p_africa, nrow = 1)
+
+# Combine Europe + row of small maps
+final_map <- grid.arrange(plot_europe, small_row, heights = c(2, 1))
+
+# Save with Cairo (better compatibility)
+Cairo::CairoPNG("final_world_map.png", width = 12, height = 8, units = "in", res = 300)
+grid.draw(final_map)
+dev.off()
+
+
+
+```
+
+
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(gridExtra)
+library(egg)
+library(grid)
+library(Cairo)
+
+# World map
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Load your data
+data <- read_csv("accessions.txt", col_names = FALSE)
+colnames(data) <- c("Accession_ID", "Name", "Code", "Country", "Country_short",
+                    "Lat", "Long", "Collector", "Extra", "CS_Number",
+                    "Admixture_Group", "Sequenced_by", "Notes")
+
+# Regions
+asia_data <- data %>% filter(Long > 60, Long < 125, Lat > 10, Lat < 60)
+africa_data <- data %>% filter(Long > -20, Long < 40, Lat > 10, Lat < 38)
+japan_data <- data %>% filter(Long > 128, Long < 146, Lat > 30, Lat < 46)
+us_data <- data %>% filter(Long < -65, Long > -130, Lat > 24, Lat < 50)
+
+asia_xlim <- range(asia_data$Long, na.rm = TRUE) + c(-2, 2)
+asia_ylim <- range(asia_data$Lat, na.rm = TRUE) + c(-2, 2)
+africa_xlim <- range(africa_data$Long, na.rm = TRUE) + c(-2, 2)
+africa_ylim <- range(africa_data$Lat, na.rm = TRUE) + c(-2, 2)
+
+# Themes
+mini_theme <- theme_void(base_size = 8)
+
+# Europe (main)
+plot_europe <- ggplot(world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = data, aes(x = Long, y = Lat), color = "blue", size = 1.6) +
+  coord_sf(xlim = c(-10, 30), ylim = c(35, 65), expand = FALSE) +
+  labs(title = "Europe") +
+  theme_minimal(base_size = 12)
+
+# Small plots
+plot_us <- ggplot(world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = us_data, aes(x = Long, y = Lat), color = "blue", size = 1.4) +
+  coord_sf(xlim = c(-130, -65), ylim = c(24, 50), expand = FALSE) +
+  labs(title = "USA") +
+  mini_theme
+
+plot_asia <- ggplot(world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = asia_data, aes(x = Long, y = Lat), color = "blue", size = 1.4) +
+  coord_sf(xlim = asia_xlim, ylim = asia_ylim, expand = FALSE) +
+  labs(title = "Asia") +
+  mini_theme
+
+plot_japan <- ggplot(world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = japan_data, aes(x = Long, y = Lat), color = "blue", size = 1.4) +
+  coord_sf(xlim = c(128, 146), ylim = c(30, 46), expand = FALSE) +
+  labs(title = "Japan") +
+  mini_theme
+
+plot_africa <- ggplot(world) +
+  geom_sf(fill = "antiquewhite") +
+  geom_point(data = africa_data, aes(x = Long, y = Lat), color = "blue", size = 1.4) +
+  coord_sf(xlim = africa_xlim, ylim = africa_ylim, expand = FALSE) +
+  labs(title = "North Africa") +
+  mini_theme
+
+# Set panel sizes for small maps
+p_us     <- set_panel_size(plot_us,     width = unit(6.2, "cm"), height = unit(5.5, "cm"))
+p_asia   <- set_panel_size(plot_asia,   width = unit(6.2, "cm"), height = unit(5.5, "cm"))
+p_japan  <- set_panel_size(plot_japan,  width = unit(6.2, "cm"), height = unit(5.5, "cm"))
+p_africa <- set_panel_size(plot_africa, width = unit(6.2, "cm"), height = unit(5.5, "cm"))
+
+# Left and right columns
+left_column  <- arrangeGrob(p_us, p_asia, ncol = 1)
+right_column <- arrangeGrob(p_japan, p_africa, ncol = 1)
+
+# Final layout: [left_column] [Europe] [right_column]
+final_map <- grid.arrange(
+  left_column,
+  plot_europe,
+  right_column,
+  ncol = 3,
+  widths = c(0.25, 0.5, 0.25)  # control space ratio
+)
+
+# Save as PNG with Cairo
+CairoPNG("final_world_map_center_europe.png", width = 12, height = 8, units = "in", res = 300)
+grid.draw(final_map)
+dev.off()
+
+```
+

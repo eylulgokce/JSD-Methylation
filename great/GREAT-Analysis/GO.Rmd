@@ -1,0 +1,255 @@
+---
+title: "data_figs_rGreat"
+output: html_document
+date: "2025-02-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries
+
+```{r, include=FALSE}
+
+library(rGREAT)
+
+library(GenomicRanges)
+library(data.table)
+library(dplyr)
+library(clusterProfiler)
+library(org.At.tair.db)
+library(ggplot2)
+
+
+```
+
+
+# define paths
+```{r, include = FALSE}
+
+file_paths <- list(
+  chg = "/Users/eylul/Desktop/JSD-Methylation/data_figs/chg.txt.gz",
+  cpg = "/Users/eylul/Desktop/JSD-Methylation/data_figs/cpg.txt.gz",
+  chh = "/Users/eylul/Desktop/JSD-Methylation/data_figs/chh.txt.gz"
+)
+
+JSD_threshold <- 0.7
+
+```
+
+
+# GO
+```{r, include = FALSE}
+run_GO <- function(gene_list, temperature) {
+  if (length(gene_list) == 0) {
+    print(paste("No significant genes found for", temperature))
+    return(NULL)
+  }
+  
+  ego <- enrichGO(
+    gene = gene_list,
+    OrgDb = org.At.tair.db,
+    keyType = "TAIR",
+    ont = "ALL", 
+    pAdjustMethod = "BH",
+    pvalueCutoff = 0.1,
+    qvalueCutoff = 0.1
+  )
+  
+  if (is.null(ego)) {
+    print(paste("No significant GO terms found for", temperature))
+    return(NULL)
+  }
+  
+  return(as.data.frame(ego))
+}
+```
+
+
+#Plot
+```{r, include = FALSE}
+plot_go <- function(ego_df, temperature, output_dir, plot_type, top_n = 20) {
+  if (nrow(ego_df) == 0) {
+    message("No significant GO terms found for ", temperature)
+    return(NULL)
+  }
+  
+  ego_df <- ego_df[order(ego_df$p.adjust), ]
+  ego_df <- head(ego_df, top_n)
+  
+  if (plot_type == "bar") {
+    p <- ggplot(ego_df, aes(x = reorder(Description, -p.adjust), y = -log10(p.adjust))) +
+      geom_bar(stat = "identity", fill = "steelblue") +
+      coord_flip() +
+      labs(title = paste("GO Enrichment Analysis for", temperature),
+           x = "GO Term", y = "-log10(p.adjust)") +
+      theme_minimal() +
+      theme(axis.text.y = element_text(size = 10))
+  } else {
+    p <- ggplot(ego_df, aes(x = -log10(p.adjust), y = reorder(Description, -p.adjust), size = Count, color = p.adjust)) +
+      geom_point() +
+      scale_color_gradient(low = "red", high = "blue") +
+      labs(title = paste("GO Enrichment Analysis for", temperature),
+           x = "-log10(p.adjust)", y = "GO Term", size = "Gene Count", color = "p.adjust") +
+      theme_minimal() +
+      theme(axis.text.y = element_text(size = 10))
+  }
+  
+  filename <- paste0(plot_type, "_", temperature, ".png")
+  ggsave(filename = file.path(output_dir, filename), plot = p, width = 15, height = 30)
+  
+  message("Plot saved as: ", file.path(output_dir, filename))
+  return(p)
+}
+
+```
+
+
+# Main 
+```{r, include = FALSE}
+
+for (context in names(file_paths)) {
+  data <- read.table(file_paths[[context]], header = TRUE, sep = "\t")
+  
+  output_dir <- file.path("GO_Enrichment_Plots", context)
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
+  
+  temperatures <- c("10C", "16C", "22C")
+  jsd_columns <- c("JSD_bit_10C", "JSD_bit_16C", "JSD_bit_22C")
+  
+  go_results <- list()
+  
+  for (i in seq_along(temperatures)) {
+    temp <- temperatures[i]
+    jsd_col <- jsd_columns[i]
+    
+    genes <- unique(data$nearestTSS.gene_id[!is.na(data[[jsd_col]]) & data[[jsd_col]] > JSD_threshold])
+    
+    ego_df <- run_GO(genes, temp)
+    go_results[[temp]] <- ego_df
+    
+    if (!is.null(ego_df) && nrow(ego_df) > 0) {
+      plot_go(ego_df, temp, output_dir, "bar")
+      plot_go(ego_df, temp, output_dir, "dot")
+    }
+  }
+  
+}
+
+```
+
+
+
+```{r}
+
+# Load libraries
+library(rGREAT)
+library(GenomicRanges)
+library(TxDb.Athaliana.BioMart.plantsmart51)
+library(dplyr)
+library(ggplot2)
+
+# Parameters
+txdb <- "TxDb.Athaliana.BioMart.plantsmart51"
+jsd_threshold <- 0.7
+go_ontologies <- c("GO:BP", "GO:MF", "GO:CC")
+input_files <- list(
+  CHG = "/Users/eylul/Desktop/JSD-Methylation/data_figs/chg.txt.gz"
+)
+allowed_chr <- paste0("Chr", c(1:5, "Mt", "Pt"))
+
+# Function to run GO enrichment for each context and temperature
+run_GO_for <- function(context, temp) {
+  message("Processing ", context, " at ", temp)
+  
+  df <- read.delim(input_files[[context]])
+  jsd_col <- paste0("JSD_bit_", temp)
+  
+  # Filter by JSD threshold
+  df <- df[!is.na(df[[jsd_col]]) & df[[jsd_col]] > jsd_threshold, ]
+  if (nrow(df) == 0) {
+    message("No high-JSD sites for ", context, " at ", temp)
+    return(NULL)
+  }
+  
+  df <- df[df$chromosome %in% c(1:5, "M", "C"), ]
+
+  df$chromosome[df$chromosome == "M"] <- "Mt"
+  df$chromosome[df$chromosome == "C"] <- "Pt"
+  df$chromosome <- paste0("Chr", df$chromosome)
+  df <- df[df$chromosome %in% allowed_chr, ]
+  if (nrow(df) == 0) {
+    message("No valid chromosomes left for ", context, " at ", temp)
+    return(NULL)
+  }
+
+  # Build GRanges
+  gr <- GRanges(
+    seqnames = df$chromosome,
+    ranges = IRanges(start = df$location - 50, end = df$location + 50)
+  )
+  mcols(gr) <- DataFrame(qval = rep(0.05, length(gr)), pval = rep(0.01, length(gr)))
+  seqlevels(gr) <- allowed_chr
+  seqinfo(gr) <- seqinfo(TxDb.Athaliana.BioMart.plantsmart51)[allowed_chr]
+
+
+  # Run GREAT for all ontologies
+  all_go_results <- list()
+  for (go_type in go_ontologies) {
+    res <- tryCatch({
+      out <- great(gr = gr, background = gr, gene_sets = go_type, tss_source = txdb)
+      tbl <- if (inherits(out, "GREATer")) out@table else out
+      tbl$context <- context
+      tbl$temperature <- temp
+      tbl$ontology <- go_type
+      return(tbl)
+    }, error = function(e) {
+      message("❌ rGREAT failed for ", context, "/", temp, " [", go_type, "]: ", e$message)
+      return(NULL)
+    })
+    all_go_results[[go_type]] <- res
+  }
+  
+  return(do.call(rbind, all_go_results))
+}
+
+# Run across context and temperature
+contexts <- names(input_files)
+temps <- c("10C", "16C", "22C")
+results <- list()
+
+for (ctx in contexts) {
+  for (temp in temps) {
+    key <- paste(ctx, temp, sep = "_")
+    results[[key]] <- run_GO_for(ctx, temp)
+  }
+}
+
+# Filter and combine results
+results <- results[!sapply(results, is.null)]
+if (length(results) == 0) {
+  message("No GO results found. Skipping plotting.")
+} else {
+  go_results <- do.call(rbind, results)
+  go_results <- go_results[!is.na(go_results$Term.Name), ]
+
+  # Plot top 10 terms per ontology and temperature
+  top_terms <- go_results %>%
+    group_by(context, temperature, ontology) %>%
+    slice_min(order_by = FDR.q.val, n = 10)
+
+  ggplot(top_terms, aes(x = reorder(Term.Name, -FDR.q.val), y = -log10(FDR.q.val), fill = temperature)) +
+    geom_col(position = "dodge") +
+    coord_flip() +
+    facet_wrap(~ontology + context, scales = "free_y") +
+    labs(title = "Top GO terms by ontology and temperature", x = "GO Term", y = "-log10(FDR)") +
+    theme_minimal()
+}
+
+
+```
+
+

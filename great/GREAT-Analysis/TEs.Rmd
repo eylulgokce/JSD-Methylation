@@ -1,0 +1,111 @@
+---
+title: "TEs"
+output: html_document
+date: "2025-03-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+library(tidyverse)
+
+files <- list(
+  chg = "/Users/eylul/Desktop/JSD-Methylation/data_figs/chg.txt.gz",
+  cpg = "/Users/eylul/Desktop/JSD-Methylation/data_figs/cpg.txt.gz",
+  chh = "/Users/eylul/Desktop/JSD-Methylation/data_figs/chh.txt.gz"
+)
+
+load_methylation_data <- function(file, context) {
+  df <- read.table(file, header = TRUE, sep = "\t")
+  df <- df %>%
+    mutate(Context = context) %>%
+    pivot_longer(cols = starts_with("JSD") | starts_with("meth"),
+                 names_to = c(".value", "Temperature"),
+                 names_pattern = "(JSD_bit|meth)_(\\d+C)") 
+  return(df)
+}
+
+# Load all datasets and merge
+methylation_data <- map2_dfr(files, names(files), load_methylation_data)
+
+# Check structure
+glimpse(methylation_data)
+```
+
+```{r}
+ggplot(methylation_data, aes(x = meth, y = JSD_bit, color = Temperature)) +
+  geom_point(alpha = 0.6) +
+  facet_wrap(~Context, scales = "free") +
+  theme_minimal() +
+  labs(title = "JSD vs. Methylation Level Across Temperatures", 
+       x = "Methylation Level", 
+       y = "JSD (bits)")
+```
+```{r}
+ggplot(methylation_data, aes(x = JSD_bit, fill = class)) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  facet_wrap(~Temperature + Context) +
+  labs(title = "Density of JSD in TEs vs. Genes")
+```
+```{r}
+library(pheatmap)
+
+heatmap_data <- methylation_data %>%
+  select(chromosome, location, Temperature, JSD_bit) %>%
+  spread(Temperature, JSD_bit) %>%
+  column_to_rownames(var = "location") %>%
+  na.omit()
+
+pheatmap(as.matrix(heatmap_data), scale = "row", clustering_distance_rows = "euclidean",
+         clustering_distance_cols = "euclidean", clustering_method = "ward.D2",
+         main = "JSD Clustering Across Temperatures")
+```
+```{r}
+library(FactoMineR)
+library(factoextra)
+
+pca_data <- methylation_data %>%
+  select(Temperature, JSD_bit) %>%
+  spread(Temperature, JSD_bit) %>%
+  na.omit()
+
+pca_res <- PCA(pca_data, scale.unit = TRUE, graph = FALSE)
+
+fviz_pca_ind(pca_res, geom = "point", col.ind = "black", title = "PCA of JSD Across Temperatures")
+```
+
+```{r}
+ggplot(methylation_data, aes(x = Temperature, y = JSD_bit, group = class, color = class)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  facet_wrap(~Context) +
+  labs(title = "JSD Trends Across Temperatures", 
+       x = "Temperature", 
+       y = "JSD (bits)")
+```
+
+
+```{r}
+library(clusterProfiler)
+library(org.At.tair.db)
+
+gene_list <- methylation_data %>%
+  filter(class == "gene") %>%
+  pull(nearestTSS.gene_id) %>%
+  unique()
+
+ego <- enrichGO(gene         = gene_list,
+                OrgDb        = org.At.tair.db,
+                keyType      = "TAIR",
+                ont          = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                readable     = TRUE)
+
+dotplot(ego)
+```
+
