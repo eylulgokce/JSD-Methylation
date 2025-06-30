@@ -1,0 +1,44 @@
+TE Superfamilies
+Class I (Retrotransposons)
+LTR/Gypsy
+
+LTR/Copia
+
+LINE/L1
+
+SINE/5S
+
+LTR/ATHILA
+
+LTR/ATGP
+
+LTR/ATLANTYS
+
+Class II (DNA transposons)
+DNA/En-Spm (also known as CACTA)
+
+DNA/Harbinger
+
+DNA/MuDR
+
+DNA/Helitron (also seen as RC/Helitron)
+
+DNA/TcMar
+
+DNA/Pogo
+
+Other categories sometimes present:
+Unclassified
+
+Simple_repeat
+
+Low_complexity
+
+
+
+
+file_path <- "/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CHG_Col-0_wt_whole-organism.bed"
+
+file_path <- "/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CHH_Col-0_wt_whole-organism.bed"
+
+file_path <- "/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CpG_Col-0_wt_whole-organism.bed"
