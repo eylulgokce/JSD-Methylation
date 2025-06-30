@@ -1,0 +1,32 @@
+Package: shannon
+Type: Package
+Title: Information-Theoretic Analysis of Genomic Data
+Version: 1.0.0
+Date: 2025-06-19
+Authors@R: c(person("Eylül", "Harputluoglu", email = "eyluelgoekce.harputluoglu@botinst.uzh.ch", role = c("aut", "cre")))
+Description: Computes Jensen-Shannon divergence and other information-theoretic quantities for genomic position files (GPFs). This package provides tools for analyzing DNA methylation diversity and other genomic features using Shannon entropy and related measures.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.2
+Depends: 
+    R (>= 4.0.0)
+Imports:
+    data.table,
+    Rsamtools,
+    GenomicRanges,
+    IRanges,
+    rtracklayer,
+    BiocGenerics,
+    S4Vectors
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+biocViews: 
+    Epigenetics,
+    DNAMethylation,
+    GenomeAnnotation,
+    Sequencing,
+    DataImport
