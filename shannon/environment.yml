@@ -1,0 +1,14 @@
+name: shannon
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+  - r
+dependencies:
+  - python=3.10
+  - pandas=1.5.3
+  - numpy
+  - numexpr
+  - openssl
+  - curl
+  - htslib
