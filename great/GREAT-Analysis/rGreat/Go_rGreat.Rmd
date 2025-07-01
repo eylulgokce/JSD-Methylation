@@ -1,0 +1,316 @@
+---
+title: "DMRs Functional analysis"
+author: ""
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: spacelab
+    highlight: pyg
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    keep_md: no
+    number_sections: no
+    fig_width: 8
+    fig_height: 8
+    fig_caption: true
+    df_print: paged
+    code_folding: show
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+  fontsize: 12pt
+  geometry: margin=1in
+  documentclass: article
+link-citations: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+# Packages required
+
+```{r setup, warning=F, message=F}
+library(rGREAT)
+library(dplyr)
+library(DT)
+library(writexl)
+library(KEGGREST)
+library(GenomicRanges)
+library(TxDb.Athaliana.BioMart.plantsmart51)
+txdb <- TxDb.Athaliana.BioMart.plantsmart51
+```
+
+# Databases
+
+## Reactome pathways
+```{r}
+reactome <- "https://plantreactome.gramene.org/download/current/gene_ids_by_pathway_and_species.tab"
+react <- data.frame(data.table::fread(input = reactome, header = F, nThread = 16))
+rdb <- react[grep(pattern = "^R-ATH", x = react$V1),]
+reactome_pathways <- split(rdb$V4, paste(rdb$V1, rdb$V2, sep = ": "))
+```
+
+## KEGG pathways
+```{r}
+kg <- keggList("organism")
+
+pathway2gene = keggLink("pathway", "ath")
+pathwayName <- keggList("pathway","ath") 
+df1 <- data.frame(gene = gsub("ath:", "", names(pathway2gene)),
+                  pathID = gsub("path:", "", pathway2gene))
+
+df2 <- data.frame(pathID = gsub("path:", "", names(pathwayName)),
+                  name = pathwayName)
+
+df_kegg <- merge(df2, df1)
+
+kegg_pathways = split(df_kegg$gene, paste(df_kegg$pathID, df_kegg$name, sep = ": "))
+```
+
+# Function to perform analysis
+```{r}
+run_great <- function(gr, db, txdb = "TxDb.Athaliana.BioMart.plantsmart51"){
+  l <- sum(!is.na(gr$JSD_bit) & gr$JSD_bit > 0.7, na.rm = TRUE)
+  dmr <- NULL
+  
+  if (l >= 5) {  # Need at least 5 regions for analysis
+    dmr <- gr[!is.na(gr$JSD_bit) & gr$JSD_bit > 0.7]
+  } else {
+    cat("Not enough significant regions for analysis\n")
+    return(data.frame())
+  }
+  
+  res <- data.frame()
+  try({
+    res <- great(gr = dmr,
+                background = gr,
+                min_gene_set_size = 5, 
+                verbose = TRUE,
+                gene_sets = db,
+                tss_source = txdb)
+  })
+  
+  if(is(res, "data.frame")){
+    return(res)
+  } else{
+    return(res@table)
+  }
+}
+```
+
+# Function to convert data to GRanges
+```{r}
+create_granges <- function(data, temp_col, context_type) {
+
+  data_filtered <- data[!is.na(data[[temp_col]]) & data[[temp_col]] > 0, ]
+  
+  if(nrow(data_filtered) == 0) {
+    cat(paste("No data available for", temp_col, "in", context_type, "\n"))
+    return(NULL)
+  }
+  
+  # GRanges 
+  gr <- GRanges(
+    seqnames = data_filtered$chromosome,
+    ranges = IRanges(start = data_filtered$location, width = 1),
+    JSD_bit = data_filtered[[temp_col]],
+    gene_id = data_filtered$nearestTSS.gene_id,
+    class = data_filtered$class
+  )
+  
+  # add region names
+  gr$name <- paste("region", 1:length(gr), sep = "_")
+  
+  return(gr)
+}
+```
+
+# Load and process data
+
+```{r}
+library(data.table)
+
+
+setwd("/Users/eylul/Desktop/JSD-Methylation/data_figs")
+
+contexts <- c("cpg", "chg", "chh")
+data_list <- list()
+
+for (context in contexts) {
+  file_path <- paste0(context, ".txt.gz")  # use .gz
+  if (file.exists(file_path)) {
+    data_list[[context]] <- fread(file_path)
+    cat(paste("Loaded", context, "data with", nrow(data_list[[context]]), "rows\n"))
+  } else {
+    cat(paste("File not found:", file_path, "\n"))
+  }
+}
+
+```
+
+
+# Analysis by Temperature and Context
+
+```{r, warning=FALSE, message=FALSE}
+
+
+temperatures <- c("10C", "16C", "22C")
+#genomic_regions <- c("intergenic", "promoter", "exon", "intron", "UTR")  
+
+# Create output directories
+dir.create("output", showWarnings = FALSE)
+for(context in contexts) {
+  dir.create(paste0("output/", toupper(context)), showWarnings = FALSE, recursive = TRUE)
+}
+
+# for each context type
+for(context in contexts) {
+  if(is.null(data_list[[context]])) next
+  
+  cat(paste("\n=== Processing", toupper(context), "context ===\n"))
+  
+  # by Temperature
+  cat("Analyzing by temperature...\n")
+  for(temp in temperatures) {
+    temp_col <- paste0("JSD_bit_", temp)
+    
+    if(temp_col %in% colnames(data_list[[context]])) {
+      cat(paste("Processing", temp, "...\n"))
+      
+      # GRanges for this temperature
+      gr_temp <- create_granges(data_list[[context]], temp_col, context)
+      
+      if(!is.null(gr_temp) && length(gr_temp) >= 5) {
+        # Run rGREAT analysis
+        res_temp <- list(
+          BP = run_great(gr = gr_temp, db = "GO:BP"),
+          MF = run_great(gr = gr_temp, db = "GO:MF"),
+          CC = run_great(gr = gr_temp, db = "GO:CC"),
+          KEGG = run_great(gr = gr_temp, db = kegg_pathways),
+          Reactome = run_great(gr = gr_temp, db = reactome_pathways)
+        )
+        
+        # Save to .xlsx
+        for(analysis_type in names(res_temp)) {
+          if(nrow(res_temp[[analysis_type]]) > 0) {
+            output_file <- paste0("output/", toupper(context), "/", 
+                                toupper(context), "_", temp, "_", analysis_type, ".xlsx")
+            write_xlsx(x = list(results = res_temp[[analysis_type]]), 
+                      path = output_file, col_names = TRUE, format_headers = TRUE)
+            cat(paste("Saved:", output_file, "\n"))
+          }
+        }
+      }
+    }
+  }
+  
+  cat("Analyzing by genomic region for each temperature...\n")
+  
+  # get unique genomic regions
+  unique_classes <- unique(data_list[[context]]$class[!is.na(data_list[[context]]$class)])
+  
+  for(region in unique_classes) {
+    cat(paste("Processing", region, "regions...\n"))
+    
+    # filter for this genomic region
+    region_data <- data_list[[context]][data_list[[context]]$class == region & 
+                                       !is.na(data_list[[context]]$class), ]
+    
+    if(nrow(region_data) < 5) {
+      cat(paste("Not enough data for", region, "in", context, "\n"))
+      next
+    }
+    
+    # each temperature separately for this genomic region
+    for(temp in temperatures) {
+      temp_col <- paste0("JSD_bit_", temp)
+      
+      if(temp_col %in% colnames(region_data)) {
+        cat(paste("Processing", region, "at", temp, "...\n"))
+        
+        # GRanges for this region and temperature
+        valid_indices <- !is.na(region_data[[temp_col]]) & 
+                        !is.nan(region_data[[temp_col]]) & 
+                        region_data[[temp_col]] > 0
+        
+        if(sum(valid_indices) < 5) {
+          cat(paste("Not enough valid data for", region, "at", temp, "\n"))
+          next
+        }
+        
+        temp_region_data <- region_data[valid_indices, ]
+        
+        gr_region_temp <- GRanges(
+          seqnames = temp_region_data$chromosome,
+          ranges = IRanges(start = temp_region_data$location, width = 1),
+          JSD_bit = temp_region_data[[temp_col]],
+          gene_id = temp_region_data$nearestTSS.gene_id,
+          class = temp_region_data$class
+        )
+        
+        gr_region_temp$name <- paste("region", 1:length(gr_region_temp), sep = "_")
+        
+        # rGREAT 
+        res_region_temp <- list(
+          BP = run_great(gr = gr_region_temp, db = "GO:BP"),
+          MF = run_great(gr = gr_region_temp, db = "GO:MF"),
+          CC = run_great(gr = gr_region_temp, db = "GO:CC"),
+          KEGG = run_great(gr = gr_region_temp, db = kegg_pathways),
+          Reactome = run_great(gr = gr_region_temp, db = reactome_pathways)
+        )
+        
+        for(analysis_type in names(res_region_temp)) {
+          if(nrow(res_region_temp[[analysis_type]]) > 0) {
+            output_file <- paste0("output/", toupper(context), "/", 
+                                toupper(context), "_", region, "_", temp, "_", analysis_type, ".xlsx")
+            write_xlsx(x = list(results = res_region_temp[[analysis_type]]), 
+                      path = output_file, col_names = TRUE, format_headers = TRUE)
+            cat(paste("Saved:", output_file, "\n"))
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+# Summary of Results
+```{r}
+cat("=== Analysis Summary ===\n")
+output_files <- list.files("output", pattern = "*.xlsx", recursive = TRUE, full.names = TRUE)
+cat(paste("Total output files created:", length(output_files), "\n"))
+
+for(file in output_files) {
+  cat(paste("-", file, "\n"))
+}
+```
+
+# Data Exploration
+```{r}
+for(context in contexts) {
+  if(!is.null(data_list[[context]])) {
+    cat(paste("\n=== Summary for", toupper(context), "===\n"))
+    cat(paste("Total regions:", nrow(data_list[[context]]), "\n"))
+    
+    for(temp in temperatures) {
+      temp_col <- paste0("JSD_bit_", temp)
+      if(temp_col %in% colnames(data_list[[context]])) {
+        valid_data <- data_list[[context]][[temp_col]][!is.na(data_list[[context]][[temp_col]])]
+        cat(paste(temp, "- Valid regions:", length(valid_data), 
+                 "Mean JSD:", round(mean(valid_data, na.rm = TRUE), 3), "\n"))
+      }
+    }
+    
+    cat("Genomic regions distribution:\n")
+    region_table <- table(data_list[[context]]$class, useNA = "always")
+    print(region_table)
+  }
+}
+```
+
+# SessionInfo
+```{r}
+sessionInfo()
+```
