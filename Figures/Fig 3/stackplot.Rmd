@@ -1,0 +1,131 @@
+---
+title: "spearman_chr"
+output: html_document
+date: "2025-05-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r}
+cor_data_chr <- site_data %>%
+  filter(!is.na(category), !chromosome %in% c("2", "4")) %>%
+  group_by(context, temperature, category, chromosome) %>%
+  summarise(rho = cor(MET, JSD, method = "spearman"), .groups = "drop") %>%
+  mutate(
+    context = factor(context, levels = c("CpG", "CHG", "CHH")),
+    category = factor(category, levels = c("LMC", "MMC", "HMC", "MSC"))
+  )
+
+p_spearman_chr <- ggplot(cor_data_chr, aes(x = context, y = rho, color = category)) +
+  geom_point(position = position_jitter(width = 0.2, height = 0), size = 3, alpha = 0.9) +
+  scale_y_continuous(limits = c(-1, 1)) +
+  scale_color_viridis_d(option = "D", end = 0.9) +
+  facet_wrap(~ temperature, nrow = 1) +
+  labs(title = "Spearman’s ρ between MET and JSD per Category",
+       x = "Context", y = "Spearman’s ρ", color = "Category") +
+  theme_minimal() +
+  theme(strip.text = element_text(size = 12, face = "bold"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5))
+
+ggsave(file.path(output_path, "SpearmanPerCategory_noChr2_4.pdf"),
+       p_spearman_chr, width = 10, height = 5.5)
+
+```
+
+
+
+
+
+
+```{r}
+library(ggplot2)
+library(viridis)
+library(patchwork)
+
+cor_data_chr <- cor_data_chr %>%
+  mutate(
+    context = factor(context, levels = c("CpG", "CHG", "CHH")),
+    category = factor(category, levels = c("LMC", "MMC", "HMC", "MSC"))
+  )
+
+plot_spearman_by_context <- function(context_name) {
+  ggplot(filter(cor_data_chr, context == context_name),
+         aes(x = temperature, y = rho, color = category, shape = chromosome)) +
+    geom_point(position = position_jitter(width = 0.2), size = 3, alpha = 0.9) +
+    facet_wrap(~ category, nrow = 1) +
+    scale_y_continuous(limits = c(-1, 1)) +
+    scale_color_viridis_d(option = "D", end = 0.9) +
+    labs(title = paste("Spearman’s ρ: MET vs JSD —", context_name),
+         x = "Temperature", y = "Spearman’s ρ",
+         color = "Category", shape = "Chromosome") +
+    theme_minimal() +
+    theme(strip.text = element_text(size = 12, face = "bold"),
+          plot.title = element_text(size = 14, face = "bold", hjust = 0.5))
+}
+
+p_cpg <- plot_spearman_by_context("CpG")
+p_chg <- plot_spearman_by_context("CHG")
+p_chh <- plot_spearman_by_context("CHH")
+
+combined_plot <- p_cpg / p_chg / p_chh + plot_layout(guides = "collect")
+ggsave(file.path(output_path, "SpearmanPerChr_by_Context.pdf"), combined_plot,
+       width = 11, height = 10)
+
+
+
+
+
+```
+
+
+
+```{r}
+library(ggplot2)
+library(viridis)
+library(patchwork)
+
+cor_data_chr <- cor_data_chr %>%
+  mutate(
+    context = factor(context, levels = c("CpG", "CHG", "CHH")),
+    category = factor(category, levels = c("LMC", "MMC", "HMC", "MSC")),
+    chromosome = factor(chromosome)  
+  )
+
+chromosomes <- levels(cor_data_chr$chromosome)
+chrom_colors <- viridis::viridis(length(chromosomes), end = 0.9)
+chrom_shapes <- seq(0, length(chromosomes) - 1) %% 25  # ggplot has ~25 distinct shapes
+
+# Function to create plot per context
+plot_spearman_by_context <- function(context_name) {
+  ggplot(filter(cor_data_chr, context == context_name),
+         aes(x = temperature, y = rho, color = chromosome, shape = chromosome)) +
+    geom_point(position = position_jitter(width = 0.2), size = 3, alpha = 0.9) +
+    facet_wrap(~ category, nrow = 1) +
+    scale_y_continuous(limits = c(-1, 1)) +
+    scale_color_manual(values = setNames(chrom_colors, chromosomes)) +
+    scale_shape_manual(values = setNames(chrom_shapes, chromosomes)) +
+    labs(title = paste("Spearman’s ρ: MET vs JSD —", context_name),
+         x = "Temperature", y = "Spearman’s ρ",
+         color = "Chromosome", shape = "Chromosome") +
+    theme_minimal() +
+    theme(strip.text = element_text(size = 12, face = "bold"),
+          plot.title = element_text(size = 14, face = "bold", hjust = 0.5))
+}
+
+p_cpg <- plot_spearman_by_context("CpG")
+p_chg <- plot_spearman_by_context("CHG")
+p_chh <- plot_spearman_by_context("CHH")
+
+combined_plot <- p_cpg / p_chg / p_chh + plot_layout(guides = "collect")
+ggsave(file.path(output_path, "SpearmanPerChr_by_Context.pdf"), combined_plot,
+       width = 11, height = 10)
+
+
+```
+
+

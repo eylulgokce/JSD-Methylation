@@ -1,0 +1,65 @@
+---
+title: "JSD_regions_MSC"
+output: html_document
+date: "2025-05-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+
+library(ggplot2)
+
+entropy <- function(mu) {
+  h <- -mu * log2(mu) - (1 - mu) * log2(1 - mu)
+  h[mu == 0 | mu == 1] <- 0
+  return(h)
+}
+
+mu_vals <- seq(0, 1, length.out = 1000)
+curve_df <- data.frame(
+  MET = mu_vals,
+  JSD = entropy(mu_vals)
+)
+
+lmc_cut <- 0.2
+hmc_cut <- 0.8
+msc_jsd_cut <- 0.7
+
+p <- ggplot() +
+  geom_line(data = curve_df, aes(x = MET, y = JSD), color = "blue", size = 1) +
+  
+  # MSC box
+  geom_segment(aes(x = lmc_cut, y = 0, xend = lmc_cut, yend = msc_jsd_cut), color = "gray40") +
+  geom_segment(aes(x = hmc_cut, y = 0, xend = hmc_cut, yend = msc_jsd_cut), color = "gray40") +
+  geom_segment(aes(x = lmc_cut, y = msc_jsd_cut, xend = hmc_cut, yend = msc_jsd_cut), color = "gray40") +
+  geom_segment(aes(x = lmc_cut, y = 0, xend = hmc_cut, yend = 0), color = "gray40") +
+
+  # Labels
+  annotate("text", x = 0.1, y = 0.08, label = "LMC", fontface = "bold", color = "gray40", size = 5) +
+  annotate("text", x = 0.5, y = 0.08, label = "MMC", fontface = "bold", color = "gray40", size = 5) +
+  annotate("text", x = 0.9, y = 0.08, label = "HMC", fontface = "bold", color = "gray40", size = 5) +
+  annotate("text", x = 0.5, y = 0.85, label = "MSC", fontface = "bold", color = "gray40", size = 5) +
+  annotate("text", x = 0.25, y = entropy(0.25) + 0.05, label = expression(italic(H(mu))), color = "blue", size = 5) +
+
+  # Axes
+  scale_x_continuous(name = expression("MET ("*mu*")"), limits = c(0, 1), expand = expansion(mult = c(0, 0))) +
+  scale_y_continuous(name = "JSD", limits = c(0, 1), expand = expansion(mult = c(0, 0))) +
+  theme_void() +
+  theme(
+    axis.title.x = element_text(size = 14, margin = margin(t = 10)),
+    axis.title.y = element_text(size = 14, angle = 90, margin = margin(r = 10)),
+    axis.text = element_text(size = 12),
+    axis.line = element_line(color = "black"),
+    axis.ticks = element_line(color = "black"),
+    plot.margin = margin(t = 20, r = 10, b = 10, l = 10)  # Top, Right, Bottom, Left
+  )
+
+
+ggsave("phase_plane_plot.pdf")
+
+```
+

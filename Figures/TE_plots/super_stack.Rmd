@@ -1,0 +1,172 @@
+---
+title: "super_stack"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(data.table)
+library(GenomicRanges)
+library(ggplot2)
+library(ComplexHeatmap)
+
+
+msc_cpg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/cpg.txt.gz")
+msc_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/chg.txt.gz")
+msc_chh <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/chh.txt.gz")
+
+bed_cpg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CpG_Col-0_wt_whole-organism.bed", header=FALSE)
+bed_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CHG_Col-0_wt_whole-organism.bed", header=FALSE)
+bed_chh <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CHH_Col-0_wt_whole-organism.bed", header=FALSE)
+
+colnames(bed_cpg) <- colnames(bed_chg) <- colnames(bed_chh) <- c("chr", "start", "end", "info", "prob_CpG", "prob_CHG", "prob_CHH", "prob_U")
+
+
+bed_chg$class <- ifelse(bed_chg$prob_CHG > bed_chg$prob_CHH, "CMT2", "RdDM")
+bed_chh$class <- ifelse(bed_chh$prob_CHG > bed_chh$prob_CHH, "CMT2", "RdDM")
+
+
+```
+
+
+###### Stackplot Proportion of 2 categories CMT2 / RdDM
+
+```{r}
+library(data.table)
+library(GenomicRanges)
+library(ggplot2)
+library(viridis)
+
+get_teclass_percentages <- function(msc_dt, bed_dt, context_label) {
+  bed_dt$class <- ifelse(bed_dt$prob_CHG > bed_dt$prob_CHH, "CMT2", "RdDM")
+  bed_dt$ID <- sub(".*ID=([^;]+);.*", "\\1", bed_dt$info)
+  
+  gr_te <- GRanges(seqnames = bed_dt$chr,
+                   ranges = IRanges(start = bed_dt$start, end = bed_dt$end),
+                   class = bed_dt$class,
+                   ID = bed_dt$ID)
+  
+  gr_msc <- GRanges(seqnames = msc_dt$chromosome,
+                    ranges = IRanges(start = msc_dt$location, width = 1),
+                    JSD_10 = msc_dt$JSD_bit_10C,
+                    meth_10 = msc_dt$meth_10C,
+                    JSD_16 = msc_dt$JSD_bit_16C,
+                    meth_16 = msc_dt$meth_16C,
+                    JSD_22 = msc_dt$JSD_bit_22C,
+                    meth_22 = msc_dt$meth_22C)
+  
+  hits <- findOverlaps(gr_msc, gr_te)
+  matched_class <- mcols(gr_te)$class[subjectHits(hits)]
+  
+  matched_temps <- msc_dt[queryHits(hits), .(JSD_10C = JSD_bit_10C,
+                                             JSD_16C = JSD_bit_16C,
+                                             JSD_22C = JSD_bit_22C)]
+  
+  melted <- melt(cbind(TE_class = matched_class, matched_temps),
+                 id.vars = "TE_class",
+                 variable.name = "temperature", value.name = "JSD")
+  
+  melted[, temperature := factor(gsub("JSD_", "", temperature),
+                                 levels = c("10C", "16C", "22C"))]
+  melted[, context := context_label]
+  return(melted)
+}
+
+msc_all <- rbindlist(list(
+  get_teclass_percentages(msc_cpg, bed_cpg, "CpG"),
+  get_teclass_percentages(msc_chg, bed_chg, "CHG"),
+  get_teclass_percentages(msc_chh, bed_chh, "CHH")
+))
+
+msc_counts <- msc_all[, .N, by = .(context, temperature, TE_class)]
+msc_counts[, percent := N / sum(N) * 100, by = .(context, temperature)]
+
+# --- Plot ---
+ggplot(msc_counts, aes(x = temperature, y = percent, fill = TE_class)) +
+  geom_bar(stat = "identity", position = "stack") +
+  facet_wrap(~context) +
+  scale_fill_viridis_d(option = "D") +
+  theme_minimal(base_size = 12) +
+  labs(title = "Percentage of MSC Sites by TE Class, Context and Temperature",
+       x = "Temperature", y = "Percentage") +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5),
+        legend.position = "right")
+
+```
+
+
+
+
+
+##### Stackplot Proportion of C types for TE superfamilies
+
+```{r}
+
+library(data.table)
+library(GenomicRanges)
+library(ggplot2)
+library(viridis)
+
+extract_msc_superfamily <- function(msc_dt, bed_dt, context_label) {
+  gr_te <- GRanges(
+    seqnames = bed_dt$chr,
+    ranges = IRanges(start = bed_dt$start, end = bed_dt$end),
+    superfamily = sub(".*Alias=([^;\\t]+)", "\\1", bed_dt$info)
+  )
+  
+  gr_msc <- GRanges(
+    seqnames = msc_dt$chromosome,
+    ranges = IRanges(start = msc_dt$location, width = 1)
+  )
+  
+  hits <- findOverlaps(gr_msc, gr_te)
+  matched_sf <- mcols(gr_te)$superfamily[subjectHits(hits)]
+  
+  matched_temps <- msc_dt[queryHits(hits), .(JSD_10C = JSD_bit_10C,
+                                             JSD_16C = JSD_bit_16C,
+                                             JSD_22C = JSD_bit_22C)]
+  
+  melted <- melt(cbind(superfamily = matched_sf, matched_temps),
+                 id.vars = "superfamily",
+                 variable.name = "temperature", value.name = "JSD")
+  
+  melted[, context := context_label]
+  melted[, temperature := factor(gsub("JSD_", "", temperature), levels = c("10C", "16C", "22C"))]
+  return(melted)
+}
+
+msc_all <- rbindlist(list(
+  extract_msc_superfamily(msc_cpg, bed_cpg, "CpG"),
+  extract_msc_superfamily(msc_chg, bed_chg, "CHG"),
+  extract_msc_superfamily(msc_chh, bed_chh, "CHH")
+))
+
+msc_summary <- msc_all[, .N, by = .(context, temperature, superfamily)]
+msc_summary[, percent := N / sum(N) * 100, by = .(context, temperature)]
+msc_summary[, superfamily := factor(superfamily,
+                                    levels = names(sort(table(superfamily), decreasing = TRUE)))]
+
+for (ctx in unique(msc_summary$context)) {
+  dt <- msc_summary[context == ctx]
+  
+  p <- ggplot(dt, aes(x = temperature, y = percent, fill = superfamily)) +
+    geom_bar(stat = "identity") +
+    theme_minimal(base_size = 12) +
+    scale_fill_viridis_d(option = "D") +
+    labs(title = paste("Proportion of C types for TE superfamilies (", ctx, ")", sep = ""),
+         x = "Temperature", y = "Percentage") +
+    theme(axis.text.x = element_text(angle = 0, hjust = 0.5),
+          legend.position = "right")
+  
+  ggsave(paste0("msc_superfamily_", tolower(ctx), ".png"),
+         plot = p, width = 10, height = 6, dpi = 300)
+}
+
+
+```
+

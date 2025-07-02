@@ -7,6 +7,7 @@
 *.jpg
 *.pdf
 *.xlsx
+*.DS_Store
 paper/_book
 paper/_main_files
 paper/paper_bookdown/.Rproj.user

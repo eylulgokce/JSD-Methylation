@@ -1,0 +1,1071 @@
+---
+title: "TE_MSC_enheatmap"
+output: html_document
+date: "2025-07-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(EnrichedHeatmap)
+library(circlize)
+library(data.table)
+library(tidyverse)
+library(report)
+library(plyr)
+library(viridis)
+library(RColorBrewer)
+library(grid)
+library(gridExtra)
+
+
+ht_opt$TITLE_PADDING <- unit(1, "mm")
+ht_opt$legend_gap <- unit(3, "mm")
+ht_opt$legend_grid_height <- unit(2, "mm")
+ht_opt$legend_grid_width <- unit(2, "mm")
+ht_opt$HEATMAP_LEGEND_PADDING <- unit(1, "mm")
+ht_opt$heatmap_border <- TRUE
+ht_opt$message <- FALSE
+
+
+input_file <- "/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/cpg.txt.gz"
+dt <- fread(input_file)
+
+
+draw_enriched_heatmaps <- function(..., names, column_titles, colors = NULL, anno_names, show_legends,
+                                   bg_col = NULL, col_an = "black", partition = NULL, raster,
+                                   axis_name = NULL, ht, la = NULL, save = FALSE, ht_title = NULL,
+                                   file_name = NULL, file_type = c("pdf", "png", "both")) {
+  set.seed(1100)
+
+  matrices <- list(...)
+  if (length(matrices) < 1) stop("At least one matrix must be provided")
+
+  clean_matrices <- lapply(matrices, na.omit)
+  common_elements <- Reduce(intersect, lapply(clean_matrices, rownames))
+  common_matrices <- lapply(clean_matrices, function(mat) mat[rownames(mat) %in% common_elements, ])
+
+  if (is.null(bg_col)) bg_col <- brewer.pal(n = 8, name = "Set2")[c(3, 4, 6, 5)]
+
+  default_col_fun <- colorRamp2(
+    c(min(unlist(common_matrices)), mean(unlist(common_matrices)), max(unlist(common_matrices))),
+    c("blue", "white", "red")
+  )
+
+  if (is.null(colors)) {
+    colors <- replicate(length(common_matrices), default_col_fun, simplify = FALSE)
+  } else if (length(colors) != length(common_matrices)) {
+    stop("The number of color functions must match the number of matrices")
+  }
+
+  heatmaps <- list()
+  for (i in 1:length(common_matrices)) {
+    h <- EnrichedHeatmap(
+      mat = common_matrices[[i]],
+      name = names[i],
+      col = colors[[i]],
+      column_title = column_titles[i],
+      left_annotation = if (is.list(la)) la[[i]] else la,
+      top_annotation = HeatmapAnnotation(
+        lines = anno_enriched(
+          height = unit(1, "cm"),
+          gp = gpar(lwd = 0.7, fontsize = 5, fontfamily = "Helvetica", col = col_an,
+                    lty = 1:length(unique(col_an))),
+          axis_param = list(
+            side = "right", facing = "inside",
+            gp = gpar(fontsize = 5, col = "black", lwd = 0.4)
+          )
+        ),
+        annotation_name_gp = gpar(fontsize = 0, fontfamily = "Helvetica"),
+        annotation_legend_param = list(
+          title_gp = gpar(fontsize = 6, fontface = "bold", fontfamily = "Helvetica"),
+          labels_gp = gpar(fontsize = 6, fontfamily = "Helvetica")
+        )
+      ),
+      border_gp = gpar(col = "black", lwd = 0.4),
+      column_title_gp = gpar(fontfamily = "Helvetica", fontsize = 5, fill = bg_col[i]),
+      axis_name_gp = gpar(fontfamily = "Helvetica", fontsize = 6, col = "black", lwd = 0.4),
+      use_raster = raster,
+      row_split = partition,
+      row_gap = unit(0.5, "mm"),
+      row_title_gp = gpar(fontfamily = "Helvetica", fontsize = 6, col = "black"),
+      row_title_rot = 0,
+      axis_name_rot = 90,
+      axis_name = axis_name,
+      width = unit(1.5, "cm"),
+      height = unit(ht, "cm"),
+      show_heatmap_legend = show_legends[i],
+      heatmap_legend_param = list(
+        direction = "vertical",
+        title = anno_names[i],
+        legend_height = unit(0.8, "cm"),
+        title_position = "topleft",
+        title_gp = gpar(fontsize = 6, fontfamily = "Helvetica"),
+        labels_gp = gpar(fontsize = 6, fontfamily = "Helvetica")
+      )
+    )
+    heatmaps[[i]] <- h
+  }
+
+  ht_list <- Reduce(`+`, heatmaps)
+
+  if (save && !is.null(file_name)) {
+    save_plot <- function(device, file_extension) {
+      device(filename = paste0(file_name, ".", file_extension), width = 11, height = 8.5, units = "in", res = 330)
+      grid.newpage()
+      pushViewport(viewport(gp = gpar(lwd = 0.5)))
+      draw(
+        ht_list,
+        column_title = ht_title,
+        column_title_gp = grid::gpar(fontsize = 16),
+        ht_gap = unit(1, "mm"),
+        merge_legends = FALSE,
+        newpage = FALSE,
+        row_sub_title_side = "left",
+        annotation_legend_side = "bottom"
+      )
+      popViewport()
+      dev.off()
+    }
+
+    if ("pdf" %in% file_type || "both" %in% file_type) save_plot(pdf, "pdf")
+    if ("png" %in% file_type || "both" %in% file_type) save_plot(png, "png")
+  }
+
+  return(ht_list)
+}
+
+
+prepare_te_matrices <- function(dt) {
+  dt_clean <- dt[!is.na(meth_10C) & !is.na(meth_16C) & !is.na(JSD_bit_10C) & !is.na(JSD_bit_16C)]
+  row_ids <- paste0(dt_clean$chromosome, "_", dt_clean$location)
+  return(list(dt_clean = dt_clean, row_ids = row_ids))
+}
+
+
+te_data <- prepare_te_matrices(dt)
+
+```
+
+
+```{r}
+library(GenomicRanges)
+library(EnrichedHeatmap)
+library(circlize)
+
+
+msc_sites <- dt[!is.na(meth_10C) & !is.na(meth_16C) & !is.na(meth_22C) &
+                !is.na(JSD_bit_10C) & !is.na(JSD_bit_16C) & !is.na(JSD_bit_22C)]
+
+
+msc_gr <- GRanges(
+  seqnames = msc_sites$chromosome,
+  ranges = IRanges(msc_sites$location, width = 1)
+)
+
+
+meth_10c_gr <- GRanges(seqnames = msc_sites$chromosome,
+                       ranges = IRanges(msc_sites$location, width = 1),
+                       score = msc_sites$meth_10C)
+
+meth_16c_gr <- GRanges(seqnames = msc_sites$chromosome,
+                       ranges = IRanges(msc_sites$location, width = 1),
+                       score = msc_sites$meth_16C)
+
+meth_22c_gr <- GRanges(seqnames = msc_sites$chromosome,
+                       ranges = IRanges(msc_sites$location, width = 1),
+                       score = msc_sites$meth_22C)
+
+# JSD
+jsd_10c_gr <- GRanges(seqnames = msc_sites$chromosome,
+                      ranges = IRanges(msc_sites$location, width = 1),
+                      score = msc_sites$JSD_bit_10C)
+
+jsd_16c_gr <- GRanges(seqnames = msc_sites$chromosome,
+                      ranges = IRanges(msc_sites$location, width = 1),
+                      score = msc_sites$JSD_bit_16C)
+
+jsd_22c_gr <- GRanges(seqnames = msc_sites$chromosome,
+                      ranges = IRanges(msc_sites$location, width = 1),
+                      score = msc_sites$JSD_bit_22C)
+
+
+mat_meth_10c <- normalizeToMatrix(signal = meth_10c_gr, target = msc_gr,
+                                  value_column = "score", extend = 500, w = 10,
+                                  mean_mode = "w0", empty_value = NA)
+
+mat_meth_16c <- normalizeToMatrix(signal = meth_16c_gr, target = msc_gr,
+                                  value_column = "score", extend = 500, w = 10,
+                                  mean_mode = "w0", empty_value = NA)
+
+mat_meth_22c <- normalizeToMatrix(signal = meth_22c_gr, target = msc_gr,
+                                  value_column = "score", extend = 500, w = 10,
+                                  mean_mode = "w0", empty_value = NA)
+
+mat_jsd_10c <- normalizeToMatrix(signal = jsd_10c_gr, target = msc_gr,
+                                 value_column = "score", extend = 500, w = 10,
+                                 mean_mode = "w0", empty_value = NA)
+
+mat_jsd_16c <- normalizeToMatrix(signal = jsd_16c_gr, target = msc_gr,
+                                 value_column = "score", extend = 500, w = 10,
+                                 mean_mode = "w0", empty_value = NA)
+
+mat_jsd_22c <- normalizeToMatrix(signal = jsd_22c_gr, target = msc_gr,
+                                 value_column = "score", extend = 500, w = 10,
+                                 mean_mode = "w0", empty_value = NA)
+
+```
+
+
+
+```{r}
+
+library(EnrichedHeatmap)
+library(circlize)
+
+
+shared_col_fun <- colorRamp2(c(0, 0.5, 1), c("blue", "white", "red"))
+
+ht_meth_10c <- EnrichedHeatmap(
+  mat_meth_10c,
+  name = "10C Meth",
+  col = shared_col_fun,
+  column_title = "10°C (Meth)",
+  top_annotation = HeatmapAnnotation(lines = anno_enriched()),
+  use_raster = TRUE
+)
+
+ht_meth_16c <- EnrichedHeatmap(
+  mat_meth_16c,
+  name = "16C Meth",
+  col = shared_col_fun,
+  column_title = "16°C (Meth)",
+  top_annotation = HeatmapAnnotation(lines = anno_enriched()),
+  use_raster = TRUE
+)
+
+ht_meth_22c <- EnrichedHeatmap(
+  mat_meth_22c,
+  name = "22C Meth",
+  col = shared_col_fun,
+  column_title = "22°C (Meth)",
+  top_annotation = HeatmapAnnotation(lines = anno_enriched()),
+  use_raster = TRUE
+)
+
+# JSD heatmaps
+ht_jsd_10c <- EnrichedHeatmap(
+  mat_jsd_10c,
+  name = "10C JSD",
+  col = shared_col_fun,
+  column_title = "10°C (JSD)",
+  top_annotation = HeatmapAnnotation(lines = anno_enriched()),
+  use_raster = TRUE
+)
+
+ht_jsd_16c <- EnrichedHeatmap(
+  mat_jsd_16c,
+  name = "16C JSD",
+  col = shared_col_fun,
+  column_title = "16°C (JSD)",
+  top_annotation = HeatmapAnnotation(lines = anno_enriched()),
+  use_raster = TRUE
+)
+
+ht_jsd_22c <- EnrichedHeatmap(
+  mat_jsd_22c,
+  name = "22C JSD",
+  col = shared_col_fun,
+  column_title = "22°C (JSD)",
+  top_annotation = HeatmapAnnotation(lines = anno_enriched()),
+  use_raster = TRUE
+)
+
+draw(
+  ht_meth_10c + ht_meth_16c + ht_meth_22c +
+  ht_jsd_10c + ht_jsd_16c + ht_jsd_22c,
+  column_title = "MSC Transposable Elements — Methylation and JSD (±500bp)",
+  column_title_gp = gpar(fontsize = 14),
+  merge_legends = TRUE
+)
+```
+
+
+```{r}
+
+library(EnrichedHeatmap)
+library(GenomicRanges)
+library(tidyverse)
+library(circlize)
+library(ComplexHeatmap)
+library(RColorBrewer)
+
+
+input_file <- "/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/cpg.txt.gz"
+df <- read_tsv(input_file, show_col_types = FALSE)
+
+
+df_msc_te <- df %>%
+  filter(class == "transposable_element") %>%
+  mutate(
+    chromosome = as.character(chromosome),
+    location = as.integer(location)
+  )
+
+
+gr_te <- GRanges(seqnames = df_msc_te$chromosome, ranges = IRanges(start = df_msc_te$location, width = 1))
+
+
+make_signal_gr_te <- function(colname) {
+  GRanges(seqnames = df_msc_te$chromosome, ranges = IRanges(df_msc_te$location, width = 1), score = as.numeric(df_msc_te[[colname]]))
+}
+
+
+gr_meth_10C_te <- make_signal_gr_te("meth_10C")
+gr_meth_16C_te <- make_signal_gr_te("meth_16C")
+gr_meth_22C_te <- make_signal_gr_te("meth_22C")
+gr_jsd_10C_te  <- make_signal_gr_te("JSD_bit_10C")
+gr_jsd_16C_te  <- make_signal_gr_te("JSD_bit_16C")
+gr_jsd_22C_te  <- make_signal_gr_te("JSD_bit_22C")
+
+
+norm_args <- list(extend = 500, w = 50, mean_mode = "absolute")
+mat_meth_10C_te <- do.call(normalizeToMatrix, c(list(signal = gr_meth_10C_te, target = gr_te), norm_args))
+mat_meth_16C_te <- do.call(normalizeToMatrix, c(list(signal = gr_meth_16C_te, target = gr_te), norm_args))
+mat_meth_22C_te <- do.call(normalizeToMatrix, c(list(signal = gr_meth_22C_te, target = gr_te), norm_args))
+mat_jsd_10C_te  <- do.call(normalizeToMatrix, c(list(signal = gr_jsd_10C_te,  target = gr_te), norm_args))
+mat_jsd_16C_te  <- do.call(normalizeToMatrix, c(list(signal = gr_jsd_16C_te,  target = gr_te), norm_args))
+mat_jsd_22C_te  <- do.call(normalizeToMatrix, c(list(signal = gr_jsd_22C_te,  target = gr_te), norm_args))
+
+
+n_sites_te <- length(gr_te)
+set_rownames <- function(mat) {
+  rownames(mat) <- paste0("site_", seq_len(n_sites_te))
+  mat
+}
+mat_meth_10C_te <- set_rownames(mat_meth_10C_te)
+mat_meth_16C_te <- set_rownames(mat_meth_16C_te)
+mat_meth_22C_te <- set_rownames(mat_meth_22C_te)
+mat_jsd_10C_te  <- set_rownames(mat_jsd_10C_te)
+mat_jsd_16C_te  <- set_rownames(mat_jsd_16C_te)
+mat_jsd_22C_te  <- set_rownames(mat_jsd_22C_te)
+
+
+sort_rows_by_mean <- function(mat) {
+  means <- rowMeans(mat, na.rm = TRUE)
+  mat[order(means, decreasing = TRUE), , drop = FALSE]
+}
+mat_meth_10C_te <- sort_rows_by_mean(mat_meth_10C_te)
+mat_meth_16C_te <- sort_rows_by_mean(mat_meth_16C_te)
+mat_meth_22C_te <- sort_rows_by_mean(mat_meth_22C_te)
+mat_jsd_10C_te  <- sort_rows_by_mean(mat_jsd_10C_te)
+mat_jsd_16C_te  <- sort_rows_by_mean(mat_jsd_16C_te)
+mat_jsd_22C_te  <- sort_rows_by_mean(mat_jsd_22C_te)
+
+
+partition <- kmeans(rowMeans(mat_meth_10C_te, na.rm = TRUE), centers = 3)$cluster
+
+
+meth_vals <- unlist(list(mat_meth_10C_te, mat_meth_16C_te, mat_meth_22C_te))
+jsd_vals  <- unlist(list(mat_jsd_10C_te, mat_jsd_16C_te, mat_jsd_22C_te))
+meth_col_fun <- colorRamp2(c(min(meth_vals), mean(meth_vals), max(meth_vals)), c("blue", "white", "red"))
+jsd_col_fun  <- colorRamp2(c(min(jsd_vals),  mean(jsd_vals),  max(jsd_vals)),  c("blue", "white", "red"))
+
+
+cpg_msc_te <- draw_enriched_heatmaps(
+  mat_meth_10C_te, mat_meth_16C_te, mat_meth_22C_te,
+  names = c("10C Meth", "16C Meth", "22C Meth"),
+  column_titles = c("10C Meth", "16C Meth", "22C Meth"),
+  colors = list(meth_col_fun, meth_col_fun, meth_col_fun),
+  anno_names = c("Meth MSC", "MSC", "MSC"),
+  show_legends = c(TRUE, FALSE, FALSE),
+  ht = 6,
+  raster = TRUE,
+  na_col = "gray",
+  axis_name = c("-500", "start", "500"),
+  partition = partition
+)
+
+jcpg_msc_te <- draw_enriched_heatmaps(
+  mat_jsd_10C_te, mat_jsd_16C_te, mat_jsd_22C_te,
+  names = c("10C JSD", "16C JSD", "22C JSD"),
+  column_titles = c("10C JSD", "16C JSD", "22C JSD"),
+  colors = list(jsd_col_fun, jsd_col_fun, jsd_col_fun),
+  anno_names = c("JSD MSC", "MSC", "MSC"),
+  show_legends = c(TRUE, FALSE, FALSE),
+  ht = 6,
+  raster = TRUE,
+  na_col = "gray",
+  axis_name = c("-500", "start", "500"),
+  partition = partition
+)
+
+
+draw(
+  cpg_msc_te + jcpg_msc_te,
+  column_title = "CpG → MSC → Transposable Elements",
+  merge_legends = TRUE
+)
+
+
+```
+
+
+## Enriched Heatmap creating function
+
+```{r eh-4, warning = F, message = F}
+
+draw_enriched_heatmaps <- function(..., names, column_titles, colors = NULL, anno_names, show_legends,
+                                   bg_col = NULL, col_an = "black", partition = NULL, raster,
+                                   axis_name = NULL, ht, la = NULL, save = FALSE, ht_title = NULL,
+                                   file_name = NULL, file_type = c("pdf", "png", "both")) {
+  set.seed(1100)
+
+  # Get all matrices
+  matrices <- list(...)
+  matrices <- list(meth_cpg_10c$TransposableElements$MSC, meth_cpg_16c$TransposableElements$MSC, meth_cpg_22c$TransposableElements$MSC)
+
+  if (length(matrices) < 1) {
+    stop("At least one matrix must be provided")
+  }
+
+  clean_matrices <- lapply(matrices, na.omit)
+
+  common_elements <- Reduce(intersect, lapply(clean_matrices, rownames))
+
+  common_matrices <- lapply(clean_matrices, function(mat) {
+    mat[rownames(mat) %in% common_elements, ]
+  })
+
+  if (is.null(bg_col)) {
+    bg_col <- brewer.pal(n = 8, name = "Set2")[c(3, 4, 6, 5)]
+  }
+
+  default_col_fun <- colorRamp2(
+    c(
+      min(unlist(common_matrices)),
+      mean(unlist(common_matrices)),
+      max(unlist(common_matrices))
+    ),
+    c("blue", "white", "red")
+  )
+
+  if (is.null(colors)) {
+    colors <- replicate(length(common_matrices), default_col_fun, simplify = FALSE)
+  } else if (length(colors) != length(common_matrices)) {
+    stop("The number of color functions must match the number of matrices")
+  }
+
+  heatmaps <- list()
+
+  for (i in 1:length(common_matrices)) {
+    h <- EnrichedHeatmap(
+      mat = common_matrices[[i]],
+      name = names[i],
+      col = colors[[i]],
+      column_title = column_titles[i],
+      left_annotation = if (is.list(la)) la[[i]] else la,
+      top_annotation = HeatmapAnnotation(
+        lines = anno_enriched(
+          height = unit(1, "cm"),
+          gp = gpar(
+            lwd = 0.7,
+            fontsize = 5,
+            fontfamily = "Helvetica",
+            col = col_an,
+            lty = 1:length(unique(col_an))
+          ),
+          axis_param = list(
+            side = "right",
+            facing = "inside",
+            gp = gpar(
+              fontsize = 5,
+              col = "black",
+              lwd = 0.4
+            )
+          )
+        ),
+        annotation_name_gp = gpar(
+          fontsize = 0,
+          fontfamily = "Helvetica"
+        ),
+        annotation_legend_param = list(
+          title_gp = gpar(
+            fontsize = 6,
+            fontface = "bold",
+            fontfamily = "Helvetica"
+          ),
+          labels_gp = gpar(
+            fontsize = 6,
+            fontfamily = "Helvetica"
+          )
+        )
+      ),
+      border_gp = gpar(
+        col = "black",
+        lwd = 0.4
+      ),
+      column_title_gp = gpar(
+        fontfamily = "Helvetica",
+        fontsize = 5,
+        fill = bg_col[i]
+      ),
+      axis_name_gp = gpar(
+        fontfamily = "Helvetica",
+        fontsize = 6,
+        col = "black",
+        lwd = 0.4
+      ),
+      use_raster = raster,
+      row_split = partition,
+      row_gap = unit(0.5, "mm"),
+      row_title_gp = gpar(fontfamily = "Helvetica", fontsize = 6, col = "black"),
+      row_title_rot = 0,
+      axis_name_rot = 90,
+      axis_name = axis_name,
+      width = unit(1.5, "cm"),
+      height = unit(ht, "cm"),
+      show_heatmap_legend = show_legends[i],
+      heatmap_legend_param = list(
+        direction = "vertical",
+        title = anno_names[i],
+        legend_height = unit(0.8, "cm"),
+        title_position = "topleft",
+        title_gp = gpar(fontsize = 6, fontfamily = "Helvetica"),
+        labels_gp = gpar(fontsize = 6, fontfamily = "Helvetica")
+      )
+    )
+    heatmaps[[i]] <- h
+  }
+
+  ht_list <- heatmaps[[1]]
+  if (length(heatmaps) > 1) {
+    for (i in 2:length(heatmaps)) {
+      ht_list <- ht_list + heatmaps[[i]]
+    }
+  }
+
+  if (save && !is.null(file_name)) {
+    save_plot <- function(device, file_extension) {
+      device(filename = paste0(file_name, ".", file_extension), width = 11, height = 8.5, units = "in", res = 330)
+      grid.newpage()
+      pushViewport(viewport(gp = gpar(lwd = 0.5)))
+      draw(
+        ht_list,
+        column_title = ht_title,
+        column_title_gp = grid::gpar(fontsize = 16),
+        ht_gap = unit(1, "mm"),
+        merge_legends = FALSE,
+        newpage = FALSE,
+        row_sub_title_side = "left",
+        annotation_legend_side = "bottom"
+      )
+      popViewport()
+      dev.off()
+    }
+
+    if ("pdf" %in% file_type || "both" %in% file_type) {
+      save_plot(pdf, "pdf")
+    }
+    if ("png" %in% file_type || "both" %in% file_type) {
+      save_plot(png, "png")
+    }
+  }
+
+  return(ht_list)
+}
+```
+
+
+###### 
+
+
+###### Using TE from bed file JSD 10
+
+```{r}
+library(EnrichedHeatmap)
+library(GenomicRanges)
+library(circlize)
+library(data.table)
+
+msc_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/chg.txt.gz")
+bed_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CHG_Col-0_wt_whole-organism.bed", header = FALSE)
+
+colnames(bed_chg) <- c("chr", "start", "end", "info", "prob_CpG", "prob_CHG", "prob_CHH", "prob_U")
+
+msc_chg_gr <- GRanges(
+  seqnames = msc_chg$chromosome,
+  ranges = IRanges(start = msc_chg$location, width = 1),
+  JSD_10 = msc_chg$JSD_bit_10C,
+  JSD_16 = msc_chg$JSD_bit_16C,
+  JSD_22 = msc_chg$JSD_bit_22C,
+  MET_10 = msc_chg$meth_10C,
+  MET_16 = msc_chg$meth_16C,
+  MET_22 = msc_chg$meth_22C
+)
+
+gr_te <- GRanges(
+  seqnames = bed_chg$chr,
+  ranges = IRanges(start = bed_chg$start, end = bed_chg$end)
+)
+strand(gr_te) <- "*"
+
+build_ht <- function(gr_msc, gr_te, colname, title, color_gp) {
+  mat <- normalizeToMatrix(gr_msc, gr_te,
+                           value_column = colname,
+                           extend = 2000, w = 50,
+                           mean_mode = "weighted",
+                           background = NA,
+                           smooth = FALSE)  #
+  mat <- mat[rowSums(!is.na(mat)) >= 5, ]
+  
+  EnrichedHeatmap(mat,
+                  name = colname,
+                  column_title = title,
+                  top_annotation = HeatmapAnnotation(lines = anno_enriched(gp = gpar(col = color_gp))),
+                  col = colorRamp2(c(0, 0.5, 1), c("blue", "white", "red")),
+                  use_raster = TRUE,
+                  show_row_names = FALSE,
+                  row_title = NULL)
+}
+
+# === 4. Build 6 heatmaps (JSD + MET at 3 temps) ===
+ht_list <- list(
+  build_ht(msc_chg_gr, gr_te, "JSD_10", "JSD - 10°C", "darkblue"),
+  build_ht(msc_chg_gr, gr_te, "JSD_16", "JSD - 16°C", "darkblue"),
+  build_ht(msc_chg_gr, gr_te, "JSD_22", "JSD - 22°C", "darkblue"),
+  build_ht(msc_chg_gr, gr_te, "MET_10", "MET - 10°C", "darkgreen"),
+  build_ht(msc_chg_gr, gr_te, "MET_16", "MET - 16°C", "darkgreen"),
+  build_ht(msc_chg_gr, gr_te, "MET_22", "MET - 22°C", "darkgreen")
+)
+
+# === 5. Draw them side-by-side ===
+draw(Reduce(`+`, ht_list),
+     heatmap_legend_side = "right",
+     main_heatmap = "JSD_10",
+     column_title = "MSC Signal Enrichment over TEs",
+     ht_gap = unit(2, "mm"))
+
+```
+
+
+
+
+
+```{r}
+library(EnrichedHeatmap)
+library(GenomicRanges)
+library(circlize)
+library(data.table)
+
+msc_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/chg.txt.gz")
+bed_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CHG_Col-0_wt_whole-organism.bed", header = FALSE)
+colnames(bed_chg) <- c("chr", "start", "end", "info", "prob_CpG", "prob_CHG", "prob_CHH", "prob_U")
+
+# get TE
+bed_chg$class <- ifelse(bed_chg$prob_CHG > bed_chg$prob_CHH, "CMT2", "RdDM")
+bed_chg$superfamily <- sub(".*Alias=([^;]+).*", "\\1", bed_chg$info)
+
+msc_chg_te <- msc_chg[msc_chg$class == "transposable_element"]
+
+msc_chg_gr <- GRanges(
+  seqnames = msc_chg_te$chromosome,
+  ranges = IRanges(start = msc_chg_te$location, width = 1),
+  JSD_10C = msc_chg_te$JSD_bit_10C,
+  MET_10C = msc_chg_te$meth_10C,
+  JSD_16C = msc_chg_te$JSD_bit_16C,
+  MET_16C = msc_chg_te$meth_16C,
+  JSD_22C = msc_chg_te$JSD_bit_22C,
+  MET_22C = msc_chg_te$meth_22C
+)
+
+gr_te_all <- GRanges(
+  seqnames = bed_chg$chr,
+  ranges = IRanges(start = bed_chg$start, end = bed_chg$end)
+)
+strand(gr_te_all) <- "*"
+
+plot_heatmap <- function(signal_gr, target_gr, value_column, label, colormap) {
+  mat <- normalizeToMatrix(signal_gr, target_gr,
+                           value_column = value_column,
+                           extend = 2000, w = 50,
+                           mean_mode = "weighted",
+                           background = NA, smooth = TRUE)
+  
+  keep_rows <- rowSums(!is.na(mat)) >= 5
+  mat <- mat[keep_rows, ]
+  
+  ht <- EnrichedHeatmap(mat,
+                        name = label,
+                        column_title = label,
+                        top_annotation = HeatmapAnnotation(lines = anno_enriched(gp = gpar(col = "darkblue"))),
+                        col = colormap,
+                        use_raster = FALSE)
+  draw(ht, heatmap_legend_side = "right", main_heatmap = label, ht_gap = unit(4, "mm"))
+}
+
+plot_heatmap(msc_chg_gr, gr_te_all, "JSD_10C", "JSD_10C - All TEs", colorRamp2(c(0, 0.5, 1), c("blue", "white", "red")))
+
+```
+
+##### make all for TEs
+
+
+```{r}
+
+library(EnrichedHeatmap)
+library(GenomicRanges)
+library(circlize)
+library(data.table)
+
+msc_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/chg.txt.gz")
+bed_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CHG_Col-0_wt_whole-organism.bed", header = FALSE)
+colnames(bed_chg) <- c("chr", "start", "end", "info", "prob_CpG", "prob_CHG", "prob_CHH", "prob_U")
+
+bed_chg$class <- ifelse(bed_chg$prob_CHG > bed_chg$prob_CHH, "CMT2", "RdDM")
+bed_chg$superfamily <- sub(".*Alias=([^;]+).*", "\\1", bed_chg$info)
+
+msc_chg_te <- msc_chg[msc_chg$class == "transposable_element"]
+
+msc_chg_gr <- GRanges(
+  seqnames = msc_chg_te$chromosome,
+  ranges = IRanges(start = msc_chg_te$location, width = 1),
+  JSD_10C = msc_chg_te$JSD_bit_10C,
+  MET_10C = msc_chg_te$meth_10C,
+  JSD_16C = msc_chg_te$JSD_bit_16C,
+  MET_16C = msc_chg_te$meth_16C,
+  JSD_22C = msc_chg_te$JSD_bit_22C,
+  MET_22C = msc_chg_te$meth_22C
+)
+
+gr_te_all <- GRanges(
+  seqnames = bed_chg$chr,
+  ranges = IRanges(start = bed_chg$start, end = bed_chg$end)
+)
+strand(gr_te_all) <- "*"
+
+plot_heatmap <- function(signal_gr, target_gr, value_column, label, colormap) {
+  mat <- normalizeToMatrix(signal_gr, target_gr,
+                           value_column = value_column,
+                           extend = 2000, w = 50,
+                           mean_mode = "weighted",
+                           background = NA, smooth = TRUE)
+  
+  keep_rows <- rowSums(!is.na(mat)) >= 5
+  mat <- mat[keep_rows, ]
+  
+  ht <- EnrichedHeatmap(mat,
+                        name = label,
+                        column_title = label,
+                        top_annotation = HeatmapAnnotation(lines = anno_enriched(gp = gpar(col = "darkblue"))),
+                        col = colormap,
+                        use_raster = FALSE)
+  draw(ht, heatmap_legend_side = "right", main_heatmap = label, ht_gap = unit(4, "mm"))
+}
+
+jsd_colors <- colorRamp2(c(0, 0.5, 1), c("blue", "white", "red"))
+met_colors <- colorRamp2(c(0, 0.5, 1), c("blue", "white", "red"))
+
+create_heatmap_object <- function(signal_gr, target_gr, value_column, label, colormap) {
+  mat <- normalizeToMatrix(signal_gr, target_gr,
+                           value_column = value_column,
+                           extend = 2000, w = 50,
+                           mean_mode = "weighted",
+                           background = NA, smooth = TRUE)
+  
+  keep_rows <- rowSums(!is.na(mat)) >= 5
+  mat <- mat[keep_rows, ]
+  
+  ht <- EnrichedHeatmap(mat,
+                        name = label,
+                        column_title = label,
+                        top_annotation = HeatmapAnnotation(lines = anno_enriched(gp = gpar(col = "darkblue"))),
+                        col = colormap,
+                        use_raster = FALSE,
+                        show_heatmap_legend = TRUE)
+  return(ht)
+}
+
+output_dir <- "heatmap_outputs"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+  cat("Created output directory:", output_dir, "\n")
+}
+
+cat("Creating heatmap objects...\n")
+
+ht_jsd_10c <- create_heatmap_object(msc_chg_gr, gr_te_all, "JSD_10C", "JSD_10C", jsd_colors)
+ht_jsd_16c <- create_heatmap_object(msc_chg_gr, gr_te_all, "JSD_16C", "JSD_16C", jsd_colors)
+ht_jsd_22c <- create_heatmap_object(msc_chg_gr, gr_te_all, "JSD_22C", "JSD_22C", jsd_colors)
+
+ht_met_10c <- create_heatmap_object(msc_chg_gr, gr_te_all, "MET_10C", "MET_10C", met_colors)
+ht_met_16c <- create_heatmap_object(msc_chg_gr, gr_te_all, "MET_16C", "MET_16C", met_colors)
+ht_met_22c <- create_heatmap_object(msc_chg_gr, gr_te_all, "MET_22C", "MET_22C", met_colors)
+
+cat("Generating combined heatmap plots...\n")
+
+pdf(file.path(output_dir, "JSD_all_temperatures_combined.pdf"), width = 18, height = 8)
+draw(ht_jsd_10c + ht_jsd_16c + ht_jsd_22c, 
+     main_heatmap = "JSD Heatmaps - All Temperatures",
+     heatmap_legend_side = "right",
+     ht_gap = unit(5, "mm"))
+dev.off()
+
+pdf(file.path(output_dir, "MET_all_temperatures_combined.pdf"), width = 18, height = 8)
+draw(ht_met_10c + ht_met_16c + ht_met_22c, 
+     main_heatmap = "MET Heatmaps - All Temperatures",
+     heatmap_legend_side = "right",
+     ht_gap = unit(5, "mm"))
+dev.off()
+
+pdf(file.path(output_dir, "All_heatmaps_grid.pdf"), width = 20, height = 12)
+draw(ht_jsd_10c + ht_jsd_16c + ht_jsd_22c %v% 
+     (ht_met_10c + ht_met_16c + ht_met_22c), 
+     main_heatmap = "Complete Heatmap Analysis",
+     heatmap_legend_side = "right",
+     ht_gap = unit(5, "mm"))
+dev.off()
+
+pdf(file.path(output_dir, "All_heatmaps_single_row.pdf"), width = 30, height = 8)
+draw(ht_jsd_10c + ht_jsd_16c + ht_jsd_22c + ht_met_10c + ht_met_16c + ht_met_22c, 
+     main_heatmap = "All Heatmaps - Single Row",
+     heatmap_legend_side = "right",
+     ht_gap = unit(3, "mm"))
+dev.off()
+
+cat("Saving individual heatmaps...\n")
+pdf(file.path(output_dir, "JSD_10C_individual.pdf"), width = 8, height = 8)
+draw(ht_jsd_10c, heatmap_legend_side = "right")
+dev.off()
+
+pdf(file.path(output_dir, "JSD_16C_individual.pdf"), width = 8, height = 8)
+draw(ht_jsd_16c, heatmap_legend_side = "right")
+dev.off()
+
+pdf(file.path(output_dir, "JSD_22C_individual.pdf"), width = 8, height = 8)
+draw(ht_jsd_22c, heatmap_legend_side = "right")
+dev.off()
+
+pdf(file.path(output_dir, "MET_10C_individual.pdf"), width = 8, height = 8)
+draw(ht_met_10c, heatmap_legend_side = "right")
+dev.off()
+
+pdf(file.path(output_dir, "MET_16C_individual.pdf"), width = 8, height = 8)
+draw(ht_met_16c, heatmap_legend_side = "right")
+dev.off()
+
+pdf(file.path(output_dir, "MET_22C_individual.pdf"), width = 8, height = 8)
+draw(ht_met_22c, heatmap_legend_side = "right")
+dev.off()
+
+cat("All heatmaps saved successfully to:", output_dir, "\n")
+cat("Generated combined files:\n")
+cat("  - JSD_all_temperatures_combined.pdf (3 JSD heatmaps side by side)\n")
+cat("  - MET_all_temperatures_combined.pdf (3 MET heatmaps side by side)\n")
+cat("  - All_heatmaps_grid.pdf (2x3 grid: JSD top row, MET bottom row)\n")
+cat("  - All_heatmaps_single_row.pdf (all 6 heatmaps in one row)\n")
+cat("Individual files also saved for reference.\n")
+
+
+```
+
+
+```{r}
+library(EnrichedHeatmap)
+library(GenomicRanges)
+library(circlize)
+library(data.table)
+
+msc_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/cpg.txt.gz")
+bed_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CpG_Col-0_wt_whole-organism.bed", header = FALSE)
+colnames(bed_chg) <- c("chr", "start", "end", "info", "prob_CpG", "prob_CHG", "prob_CHH", "prob_U")
+
+bed_chg$class <- ifelse(bed_chg$prob_CHG > bed_chg$prob_CHH, "CMT2", "RdDM")
+bed_chg$superfamily <- sub(".*Alias=([^;]+).*", "\\1", bed_chg$info)
+
+msc_chg_te <- msc_chg[msc_chg$class == "transposable_element"]
+
+msc_chg_gr <- GRanges(
+  seqnames = msc_chg_te$chromosome,
+  ranges = IRanges(start = msc_chg_te$location, width = 1),
+  JSD_10C = msc_chg_te$JSD_bit_10C,
+  MET_10C = msc_chg_te$meth_10C,
+  JSD_16C = msc_chg_te$JSD_bit_16C,
+  MET_16C = msc_chg_te$meth_16C,
+  JSD_22C = msc_chg_te$JSD_bit_22C,
+  MET_22C = msc_chg_te$meth_22C
+)
+
+gr_te_all <- GRanges(
+  seqnames = bed_chg$chr,
+  ranges = IRanges(start = bed_chg$start, end = bed_chg$end)
+)
+strand(gr_te_all) <- "*"
+
+plot_heatmap <- function(signal_gr, target_gr, value_column, label, colormap) {
+  mat <- normalizeToMatrix(signal_gr, target_gr,
+                           value_column = value_column,
+                           extend = 2000, w = 50,
+                           mean_mode = "weighted",
+                           background = NA, smooth = TRUE)
+  
+  keep_rows <- rowSums(!is.na(mat)) >= 5
+  mat <- mat[keep_rows, ]
+  
+  ht <- EnrichedHeatmap(mat,
+                        name = label,
+                        column_title = label,
+                        top_annotation = HeatmapAnnotation(lines = anno_enriched(gp = gpar(col = "darkblue"))),
+                        col = colormap,
+                        use_raster = FALSE)
+  draw(ht, heatmap_legend_side = "right", main_heatmap = label, ht_gap = unit(4, "mm"))
+}
+
+jsd_colors <- colorRamp2(c(0, 0.5, 1), c("blue", "white", "red"))
+met_colors <- colorRamp2(c(0, 0.5, 1), c("blue", "white", "red"))
+
+output_dir <- "heatmap_outputs"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+  cat("Created output directory:", output_dir, "\n")
+}
+
+# JSD Heatmaps
+cat("Generating and saving JSD heatmaps...\n")
+
+pdf(file.path(output_dir, "JSD_10C_heatmap.pdf"), width = 10, height = 8)
+plot_heatmap(msc_chg_gr, gr_te_all, "JSD_10C", "JSD_10C - All TEs", jsd_colors)
+dev.off()
+
+pdf(file.path(output_dir, "JSD_16C_heatmap.pdf"), width = 10, height = 8)
+plot_heatmap(msc_chg_gr, gr_te_all, "JSD_16C", "JSD_16C - All TEs", jsd_colors)
+dev.off()
+
+pdf(file.path(output_dir, "JSD_22C_heatmap.pdf"), width = 10, height = 8)
+plot_heatmap(msc_chg_gr, gr_te_all, "JSD_22C", "JSD_22C - All TEs", jsd_colors)
+dev.off()
+
+# MET Heatmaps  
+cat("Generating and saving MET heatmaps...\n")
+
+pdf(file.path(output_dir, "MET_10C_heatmap.pdf"), width = 10, height = 8)
+plot_heatmap(msc_chg_gr, gr_te_all, "MET_10C", "MET_10C - All TEs", met_colors)
+dev.off()
+
+pdf(file.path(output_dir, "MET_16C_heatmap.pdf"), width = 10, height = 8)
+plot_heatmap(msc_chg_gr, gr_te_all, "MET_16C", "MET_16C - All TEs", met_colors)
+dev.off()
+
+pdf(file.path(output_dir, "MET_22C_heatmap.pdf"), width = 10, height = 8)
+plot_heatmap(msc_chg_gr, gr_te_all, "MET_22C", "MET_22C - All TEs", met_colors)
+dev.off()
+
+cat("All heatmaps saved successfully to:", output_dir, "\n")
+cat("Generated files:\n")
+cat("  - JSD_10C_heatmap.pdf\n")
+cat("  - JSD_16C_heatmap.pdf\n") 
+cat("  - JSD_22C_heatmap.pdf\n")
+cat("  - MET_10C_heatmap.pdf\n")
+cat("  - MET_16C_heatmap.pdf\n")
+cat("  - MET_22C_heatmap.pdf\n")
+```
+
+
+
+
+```{r}
+library(EnrichedHeatmap)
+library(GenomicRanges)
+library(circlize)
+library(data.table)
+library(grid)  # for unit()
+
+
+
+msc_chg_te <- msc_chg[class == "transposable_element"]
+
+gr_te_all <- GRanges(
+  seqnames = bed_chg$chr,
+  ranges   = IRanges(start = bed_chg$start, end = bed_chg$end),
+  strand   = "*"
+)
+
+msc_chg_gr <- GRanges(
+  seqnames = msc_chg_te$chromosome,
+  ranges   = IRanges(start = msc_chg_te$location, width = 1),
+  JSD_10C  = msc_chg_te$JSD_bit_10C,
+  MET_10C  = msc_chg_te$meth_10C,
+  JSD_16C  = msc_chg_te$JSD_bit_16C,
+  MET_16C  = msc_chg_te$meth_16C,
+  JSD_22C  = msc_chg_te$JSD_bit_22C,
+  MET_22C  = msc_chg_te$meth_22C
+)
+
+make_heatmap <- function(sig_gr, targ_gr, value_col, title, col_fn) {
+  mat <- normalizeToMatrix(sig_gr, targ_gr,
+                           value_column = value_col,
+                           extend = 2000, w = 50,
+                           mean_mode = "weighted",
+                           background = NA, smooth = TRUE)
+  mat <- mat[rowSums(!is.na(mat)) >= 5, , drop = FALSE]
+  EnrichedHeatmap(
+    mat,
+    name           = title,
+    column_title   = title,
+    top_annotation = HeatmapAnnotation(lines = anno_enriched()),
+    col            = col_fn,
+    use_raster     = FALSE
+  )
+}
+
+jsd_cols <- colorRamp2(c(0, 0.5, 1), c("blue","white","red"))
+met_cols <- colorRamp2(c(0, 0.5, 1), c("blue","white","red"))
+
+ht_jsd_10 <- make_heatmap(msc_chg_gr, gr_te_all, "JSD_10C", "JSD 10 °C", jsd_cols)
+ht_jsd_16 <- make_heatmap(msc_chg_gr, gr_te_all, "JSD_16C", "JSD 16 °C", jsd_cols)
+ht_jsd_22 <- make_heatmap(msc_chg_gr, gr_te_all, "JSD_22C", "JSD 22 °C", jsd_cols)
+
+ht_met_10 <- make_heatmap(msc_chg_gr, gr_te_all, "MET_10C", "MET 10 °C", met_cols)
+ht_met_16 <- make_heatmap(msc_chg_gr, gr_te_all, "MET_16C", "MET 16 °C", met_cols)
+ht_met_22 <- make_heatmap(msc_chg_gr, gr_te_all, "MET_22C", "MET 22 °C", met_cols)
+
+if (!dir.exists("heatmap_outputs")) dir.create("heatmap_outputs")
+
+pdf("heatmap_outputs/JSD_all_together.pdf", width = 30, height = 8)
+draw(ht_jsd_10 + ht_jsd_16 + ht_jsd_22,
+     ht_gap = unit(4, "mm"),
+     merge_legends = TRUE,
+     heatmap_legend_side = "right")
+dev.off()
+
+pdf("heatmap_outputs/MET_all_together.pdf", width = 30, height = 8)
+draw(ht_met_10 + ht_met_16 + ht_met_22,
+     ht_gap = unit(4, "mm"),
+     merge_legends = TRUE,
+     heatmap_legend_side = "right")
+dev.off()
+
+
+```
+
+```{r}
+pdf("heatmap_outputs/JSD_MET_all_together.pdf",
+    width = 10,   
+    height = 8)   
+draw(
+  ht_jsd_10 + ht_met_10 +
+  ht_jsd_16 + ht_met_16 +
+  ht_jsd_22 + ht_met_22,
+  ht_gap             = unit(2, "mm"),  # maybe tighten gaps
+  merge_legends      = TRUE,
+  heatmap_legend_side = "right"
+)
+dev.off()
+
+
+
+```
+
