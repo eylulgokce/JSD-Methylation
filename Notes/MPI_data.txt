@@ -1,0 +1,46 @@
+Missing data:
+MPI - 23 Degree --> total 13 
+
+Ecotype_id	Name
+470	BRR4
+504	BRR57
+742	LI-SET-036
+1739	KBS-Mac-68
+1741	KBS-Mac-74
+1942	MNF-Che-47
+1943	MNF-Che-49
+2081	MuskSP-68
+2106	MSGA-10
+2159	Paw-13
+2370	Yng-4
+2412	Yng-53
+8699	328PNA062
+
+
+
+
+RNA-seq Data – GSE80744
+
+Link: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE80744
+
+Dataset: ath1001_tx_norm_2016-04-21-UQ_gNorm_normCounts_k4.tsv.gz
+
+Result: Columns include sample IDs prefixed with "X" and numeric ecotype IDs
+
+Checked for 470, 504 etc. → Not found
+
+
+Methylation Data – GSE43857 / SRP018263
+
+GEO link: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE43857
+
+SRA link: https://www.ncbi.nlm.nih.gov/Traces/study/?acc=SRP018263
+
+Method: Searched for matching ecotype_ids and sample names in SRA Run Selector
+
+Result: No matching records
+
+
+
+https://www.ncbi.nlm.nih.gov/geo/browse/?view=samples&series=80744&zsort=date&display=20
+https://1001genomes.org/accessions.html
