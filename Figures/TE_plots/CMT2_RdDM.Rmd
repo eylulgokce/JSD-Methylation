@@ -1,0 +1,282 @@
+---
+title: "CMT2_RdDM"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(data.table)
+library(GenomicRanges)
+library(ggplot2)
+library(ComplexHeatmap)
+
+
+msc_cpg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/cpg.txt.gz")
+msc_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/chg.txt.gz")
+msc_chh <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/chh.txt.gz")
+
+bed_cpg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CpG_Col-0_wt_whole-organism.bed", header=FALSE)
+bed_chg <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CHG_Col-0_wt_whole-organism.bed", header=FALSE)
+bed_chh <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/meta_methylome/new/data/results/probability-ctype_TE_CHH_Col-0_wt_whole-organism.bed", header=FALSE)
+
+colnames(bed_cpg) <- colnames(bed_chg) <- colnames(bed_chh) <- c("chr", "start", "end", "info", "prob_CpG", "prob_CHG", "prob_CHH", "prob_U")
+
+
+bed_chg$class <- ifelse(bed_chg$prob_CHG > bed_chg$prob_CHH, "CMT2", "RdDM")
+bed_chh$class <- ifelse(bed_chh$prob_CHG > bed_chh$prob_CHH, "CMT2", "RdDM")
+
+
+```
+
+```{r}
+library(GenomicRanges)
+library(ggplot2)
+
+bed_chg$class <- ifelse(bed_chg$prob_CHG > bed_chg$prob_CHH, "CMT2", "RdDM")
+bed_chg$ID <- sub(".*ID=([^;]+);.*", "\\1", bed_chg$info)
+
+
+gr_te <- GRanges(seqnames = bed_chg$chr,
+                 ranges = IRanges(start = bed_chg$start, end = bed_chg$end),
+                 class = bed_chg$class,
+                 ID = bed_chg$ID)
+
+gr_msc <- GRanges(seqnames = msc_chg$chromosome,
+                  ranges = IRanges(start = msc_chg$location, width = 1),
+                  JSD_10 = msc_chg$JSD_bit_10C,
+                  meth_10 = msc_chg$meth_10C,
+                  JSD_16 = msc_chg$JSD_bit_16C,
+                  meth_16 = msc_chg$meth_16C,
+                  JSD_22 = msc_chg$JSD_bit_22C,
+                  meth_22 = msc_chg$meth_22C)
+
+
+hits <- findOverlaps(gr_msc, gr_te)
+msc_mapped <- as.data.table(mcols(gr_msc)[queryHits(hits), ])
+msc_mapped$TE_class <- mcols(gr_te)$class[subjectHits(hits)]
+
+
+msc_long <- melt(msc_mapped,
+                 id.vars = "TE_class",
+                 measure.vars = patterns("^JSD_", "^meth_"),
+                 variable.name = "temperature",
+                 value.name = c("JSD", "meth"))
+
+msc_long[, temperature := factor(gsub(".*_(10|16|22)", "\\1", temperature),
+                                 levels = c("10", "16", "22"),
+                                 labels = c("10°C", "16°C", "22°C"))]
+
+
+ggplot(msc_long, aes(x = temperature, y = JSD, color = TE_class)) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  facet_wrap(~TE_class, scales = "free_y") +
+  theme_minimal() +
+  labs(title = "JSD for MSC sites by TE Class and Temperature",
+       x = "Temperature", y = "JSD")
+
+```
+
+
+
+
+
+```{r}
+
+gr_te_sf <- GRanges(seqnames = bed_chg$chr,
+                    ranges = IRanges(start = bed_chg$start, end = bed_chg$end),
+                    superfamily = bed_chg$superfamily)
+
+gr_msc <- GRanges(seqnames = msc_chg$chromosome,
+                  ranges = IRanges(start = msc_chg$location, width = 1),
+                  JSD_10 = msc_chg$JSD_bit_10C,
+                  meth_10 = msc_chg$meth_10C,
+                  JSD_16 = msc_chg$JSD_bit_16C,
+                  meth_16 = msc_chg$meth_16C,
+                  JSD_22 = msc_chg$JSD_bit_22C,
+                  meth_22 = msc_chg$meth_22C)
+
+hits_sf <- findOverlaps(gr_msc, gr_te_sf)
+
+msc_mapped_sf <- as.data.table(mcols(gr_msc)[queryHits(hits_sf), ])
+msc_mapped_sf$superfamily <- mcols(gr_te_sf)$superfamily[subjectHits(hits_sf)]
+
+jsd_cols <- grep("^JSD_", names(msc_mapped_sf), value = TRUE)
+meth_cols <- grep("^meth_", names(msc_mapped_sf), value = TRUE)
+
+msc_long_sf <- melt(msc_mapped_sf,
+                    id.vars = "superfamily",
+                    measure.vars = list(JSD = jsd_cols,
+                                        meth = meth_cols),
+                    variable.name = "temp_index")
+
+msc_long_sf[, temperature := factor(temp_index,
+                                    levels = 1:3,
+                                    labels = c("10°C", "16°C", "22°C"))]
+msc_long_sf[, temp_index := NULL] 
+
+ggplot(msc_long_sf, aes(x = temperature, y = JSD, color = superfamily)) +
+  geom_jitter(width = 0.2, alpha = 0.4, size = 0.8) +
+  facet_wrap(~superfamily, scales = "free_y") +
+  theme_minimal(base_size = 10) +
+  labs(title = "JSD for CHG MSC Sites by TE Superfamily and Temperature",
+       x = "Temperature", y = "JSD")
+
+```
+
+
+```{r}
+
+library(data.table)
+library(GenomicRanges)
+library(ggplot2)
+library(viridis)
+
+# match MSC to TE superfamilies
+extract_msc_superfamily <- function(msc_dt, bed_dt, context_label) {
+  gr_te <- GRanges(
+    seqnames = bed_dt$chr,
+    ranges = IRanges(start = bed_dt$start, end = bed_dt$end),
+    superfamily = sub(".*Alias=([^;\\t]+)", "\\1", bed_dt$info)
+  )
+  
+  gr_msc <- GRanges(
+    seqnames = msc_dt$chromosome,
+    ranges = IRanges(start = msc_dt$location, width = 1)
+  )
+  
+  hits <- findOverlaps(gr_msc, gr_te)
+  matched_sf <- mcols(gr_te)$superfamily[subjectHits(hits)]
+  
+  matched_temps <- msc_dt[queryHits(hits), .(JSD_10C = JSD_bit_10C,
+                                             JSD_16C = JSD_bit_16C,
+                                             JSD_22C = JSD_bit_22C)]
+  
+  melted <- melt(cbind(superfamily = matched_sf, matched_temps),
+                 id.vars = "superfamily",
+                 variable.name = "temperature", value.name = "JSD")
+  
+  melted[, context := context_label]
+  melted[, temperature := factor(gsub("JSD_", "", temperature), levels = c("10C", "16C", "22C"))]
+  return(melted)
+}
+
+#Combine all MSC-context
+msc_all <- rbindlist(list(
+  extract_msc_superfamily(msc_cpg, bed_cpg, "CpG"),
+  extract_msc_superfamily(msc_chg, bed_chg, "CHG"),
+  extract_msc_superfamily(msc_chh, bed_chh, "CHH")
+))
+
+# summary and reorder superfamilies 
+msc_summary <- msc_all[, .N, by = .(context, temperature, superfamily)]
+msc_summary[, percent := N / sum(N) * 100, by = .(context, temperature)]
+msc_summary[, superfamily := factor(superfamily,
+                                    levels = names(sort(table(superfamily), decreasing = TRUE)))]
+
+# plot and save
+for (ctx in unique(msc_summary$context)) {
+  dt <- msc_summary[context == ctx]
+  
+  p <- ggplot(dt, aes(x = temperature, y = percent, fill = superfamily)) +
+    geom_bar(stat = "identity") +
+    theme_minimal(base_size = 12) +
+    scale_fill_viridis_d(option = "D") +
+    labs(title = paste("MSC Site Percentage by TE Superfamily (", ctx, ")", sep = ""),
+         x = "Temperature", y = "Percentage") +
+    theme(axis.text.x = element_text(angle = 0, hjust = 0.5),
+          legend.position = "right")
+  
+  ggsave(paste0("msc_superfamily_", tolower(ctx), ".png"),
+         plot = p, width = 10, height = 6, dpi = 300)
+}
+
+
+```
+
+
+
+
+
+```{r}
+library(EnrichedHeatmap)
+library(GenomicRanges)
+library(circlize)
+library(data.table)
+
+# MSC CHG sites 
+msc_chg_gr <- GRanges(
+  seqnames = msc_chg$chromosome,
+  ranges = IRanges(start = msc_chg$location, width = 1),
+  JSD = msc_chg$JSD_bit_10C,
+  MET = msc_chg$meth_10C
+)
+
+# TEs 
+gr_te_sf <- GRanges(
+  seqnames = bed_chg$chr,
+  ranges = IRanges(start = bed_chg$start, end = bed_chg$end),
+  superfamily = bed_chg$superfamily
+)
+strand(gr_te_sf) <- "*"
+
+# Top superfamilies only
+top_superfamilies <- names(sort(table(gr_te_sf$superfamily), decreasing = TRUE))[1:6]
+gr_te_sf <- gr_te_sf[gr_te_sf$superfamily %in% top_superfamilies]
+
+for (sf in unique(gr_te_sf$superfamily)) {
+  target_sf <- gr_te_sf[gr_te_sf$superfamily == sf]
+  
+
+  jsd_mat <- normalizeToMatrix(msc_chg_gr, target_sf,
+                               value_column = "JSD",
+                               extend = 2000, w = 50,
+                               mean_mode = "weighted",
+                               background = NA, smooth = TRUE)
+  
+  met_mat <- normalizeToMatrix(msc_chg_gr, target_sf,
+                               value_column = "MET",
+                               extend = 2000, w = 50,
+                               mean_mode = "weighted",
+                               background = NA, smooth = TRUE)
+  
+  keep_rows <- rowSums(!is.na(jsd_mat)) >= 5
+  jsd_mat <- jsd_mat[keep_rows, ]
+  
+  keep_rows <- rowSums(!is.na(met_mat)) >= 5
+  met_mat <- met_mat[keep_rows, ]
+  
+  ht_jsd <- EnrichedHeatmap(jsd_mat,
+                            name = "JSD_10C",
+                            column_title = paste0("JSD - ", sf),
+                            top_annotation = HeatmapAnnotation(lines = anno_enriched(gp = gpar(col = "darkblue"))),
+                            col = colorRamp2(c(0, 0.5, 1), c("blue", "white", "red")),
+                            use_raster = TRUE)
+  
+  ht_met <- EnrichedHeatmap(met_mat,
+                            name = "MET_10C",
+                            column_title = paste0("MET - ", sf),
+                            top_annotation = HeatmapAnnotation(lines = anno_enriched(gp = gpar(col = "darkblue"))),
+                            col = colorRamp2(c(0, 0.5, 1), c( "blue", "white", "red")),
+                            use_raster = TRUE)
+  
+    # JSD
+  draw(ht_jsd,
+       heatmap_legend_side = "right",
+       main_heatmap = "JSD_10C",
+       ht_gap = unit(4, "mm"))
+  
+  # MET
+  draw(ht_met,
+       heatmap_legend_side = "right",
+       main_heatmap = "MET_10C",
+       ht_gap = unit(4, "mm"))
+
+}
+
+```
+
+
