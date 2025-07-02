@@ -1,0 +1,518 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-06-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# CHG
+
+```{r}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(forcats)
+library(data.table)
+
+chg_data <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/chg.txt.gz") 
+
+output_dir <- "GO_Plots"
+if (!dir.exists(output_dir)) dir.create(output_dir)
+
+temperatures <- c("10C", "16C", "22C")
+
+for (temp in temperatures) {
+  cat("\n===============================\n")
+  cat(paste("Processing", temp, "\n"))
+  
+  jsd_col <- paste0("JSD_bit_", temp)
+  
+  if (!jsd_col %in% colnames(chg_data)) {
+    cat(paste("Missing JSD column:", jsd_col, "\n"))
+    next
+  }
+  
+  significant_regions <- chg_data %>%
+    filter(
+      class == "transposable_element",
+      !is.na(.data[[jsd_col]]),
+      .data[[jsd_col]] > 0.7
+    )
+  
+  total_input_genes <- length(unique(significant_regions$nearestTSS.gene_id))
+  cat(paste("Total input genes for", temp, ":", total_input_genes, "\n"))
+  
+  if (total_input_genes == 0) {
+    cat("No significant regions found — skipping.\n")
+    next
+  }
+  
+  base_path <- "/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/GO/output_2/CHG"
+  file_paths <- c(
+    BP = file.path(base_path, paste0("CHG_transposable_element_", temp, "_BP.xlsx")),
+    CC = file.path(base_path, paste0("CHG_transposable_element_", temp, "_CC.xlsx")),
+    MF = file.path(base_path, paste0("CHG_transposable_element_", temp, "_MF.xlsx"))
+  )
+  
+  combined_df <- data.frame()
+  for (category in names(file_paths)) {
+    path <- file_paths[[category]]
+    if (file.exists(path)) {
+      df <- read_xlsx(path)
+      df$GO_category <- category
+      combined_df <- bind_rows(combined_df, df)
+      cat(paste("Loaded", category, "with", nrow(df), "terms\n"))
+    } else {
+      cat(paste("File not found:", path, "\n"))
+    }
+  }
+  
+  if (nrow(combined_df) == 0) {
+    cat("No enrichment data found — skipping.\n")
+    next
+  }
+  
+  df_filtered <- combined_df %>%
+    filter(
+      !is.na(p_value),
+      p_value < 0.05,
+      observed_gene_hits >= 3,
+      gene_set_size >= 5
+    ) %>%
+    mutate(
+      GeneRatio = observed_gene_hits / total_input_genes,
+      Count = observed_gene_hits,
+      pvalue = p_value,
+      description_with_category = paste0(description, " (", GO_category, ")"),
+      description_with_category = fct_reorder(description_with_category, GeneRatio)
+    ) %>%
+    arrange(p_value) %>%
+    slice_head(n = 20)
+  
+  if (nrow(df_filtered) == 0) {
+    cat("No significant GO terms found — skipping.\n")
+    next
+  }
+  
+  p <- ggplot(df_filtered, aes(x = GeneRatio, y = description_with_category)) +
+    geom_point(aes(size = Count, color = pvalue)) +
+    scale_color_gradient(low = "red", high = "blue", name = "p-value") +
+    scale_size(range = c(3, 10), name = "Gene Count") +
+    theme_minimal(base_size = 12) +
+    labs(
+      title = "GO Enrichment Analysis",
+      subtitle = paste("CHG Transposable Elements at", temp),
+      x = "Gene Ratio",
+      y = NULL
+    ) +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      plot.subtitle = element_text(size = 12),
+      axis.text.y = element_text(size = 9),
+      legend.position = "right"
+    )
+  
+  print(p)
+  
+  ggsave(
+    filename = file.path(output_dir, paste0("GO_plot_", temp, ".png")),
+    plot = p, width = 12, height = 8, dpi = 300
+  )
+  cat(paste("Plot saved for", temp, "\n"))
+}
+
+```
+
+
+# CHH
+```{r}
+
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(forcats)
+library(data.table)
+
+chh_data <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/chh.txt.gz") 
+
+output_dir <- "GO_Plots"
+if (!dir.exists(output_dir)) dir.create(output_dir)
+
+temperatures <- c("10C", "16C", "22C")
+
+for (temp in temperatures) {
+  cat("\n===============================\n")
+  cat(paste("Processing CHH -", temp, "\n"))
+  
+  jsd_col <- paste0("JSD_bit_", temp)
+  
+  if (!jsd_col %in% colnames(chh_data)) {
+    cat(paste("Missing JSD column:", jsd_col, "\n"))
+    next
+  }
+  
+  significant_regions <- chh_data %>%
+    filter(
+      class == "transposable_element",
+      !is.na(.data[[jsd_col]]),
+      .data[[jsd_col]] > 0.7
+    )
+  
+  total_input_genes <- length(unique(significant_regions$nearestTSS.gene_id))
+  cat(paste("Total input genes for", temp, ":", total_input_genes, "\n"))
+  
+  if (total_input_genes == 0) {
+    cat("No significant regions found — skipping.\n")
+    next
+  }
+  
+  base_path <- "/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/GO/output_2/CHH"
+  file_paths <- c(
+    BP = file.path(base_path, paste0("CHH_transposable_element_", temp, "_BP.xlsx")),
+    CC = file.path(base_path, paste0("CHH_transposable_element_", temp, "_CC.xlsx")),
+    MF = file.path(base_path, paste0("CHH_transposable_element_", temp, "_MF.xlsx"))
+  )
+  
+  combined_df <- data.frame()
+  for (category in names(file_paths)) {
+    path <- file_paths[[category]]
+    if (file.exists(path)) {
+      df <- read_xlsx(path)
+      df$GO_category <- category
+      combined_df <- bind_rows(combined_df, df)
+      cat(paste("Loaded", category, "with", nrow(df), "terms\n"))
+    } else {
+      cat(paste("File not found:", path, "\n"))
+    }
+  }
+  
+  if (nrow(combined_df) == 0) {
+    cat("No enrichment data found — skipping.\n")
+    next
+  }
+  
+  df_filtered <- combined_df %>%
+    filter(
+      !is.na(p_value),
+      p_value < 0.05,
+      observed_gene_hits >= 3,
+      gene_set_size >= 5
+    ) %>%
+    mutate(
+      GeneRatio = observed_gene_hits / total_input_genes,
+      Count = observed_gene_hits,
+      pvalue = p_value,
+      description_with_category = paste0(description, " (", GO_category, ")"),
+      description_with_category = fct_reorder(description_with_category, GeneRatio)
+    ) %>%
+    arrange(p_value) %>%
+    slice_head(n = 20)
+  
+  if (nrow(df_filtered) == 0) {
+    cat("No significant GO terms found — skipping.\n")
+    next
+  }
+  
+  p <- ggplot(df_filtered, aes(x = GeneRatio, y = description_with_category)) +
+    geom_point(aes(size = Count, color = pvalue)) +
+    scale_color_gradient(low = "red", high = "blue", name = "p-value") +
+    scale_size(range = c(3, 10), name = "Gene Count") +
+    theme_minimal(base_size = 12) +
+    labs(
+      title = "GO Enrichment",
+      subtitle = paste("CHH Transposable Elements at", temp),
+      x = "Gene Ratio",
+      y = NULL
+    ) +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      plot.subtitle = element_text(size = 12),
+      axis.text.y = element_text(size = 9),
+      legend.position = "right"
+    )
+  
+  print(p)
+  
+  # Save
+  ggsave(
+    filename = file.path(output_dir, paste0("GO_plot_CHH_", temp, ".png")),
+    plot = p, width = 12, height = 8, dpi = 300
+  )
+  cat(paste("Plot saved for CHH -", temp, "\n"))
+}
+
+
+```
+
+# CpG
+
+```{r}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(forcats)
+library(data.table)
+
+cpg_data <- fread("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/cpg.txt.gz") 
+
+output_dir <- "GO_Plots"
+if (!dir.exists(output_dir)) dir.create(output_dir)
+
+temperatures <- c("10C", "16C", "22C")
+
+for (temp in temperatures) {
+  cat("\n===============================\n")
+  cat(paste("Processing CpG -", temp, "\n"))
+  
+  jsd_col <- paste0("JSD_bit_", temp)
+  
+  if (!jsd_col %in% colnames(cpg_data)) {
+    cat(paste("Missing JSD column:", jsd_col, "\n"))
+    next
+  }
+  
+  significant_regions <- cpg_data %>%
+    filter(
+      class == "transposable_element",
+      !is.na(.data[[jsd_col]]),
+      .data[[jsd_col]] > 0.7
+    )
+  
+  total_input_genes <- length(unique(significant_regions$nearestTSS.gene_id))
+  cat(paste("Total input genes for", temp, ":", total_input_genes, "\n"))
+  
+  if (total_input_genes == 0) {
+    cat("No significant regions found — skipping.\n")
+    next
+  }
+  
+  base_path <- "/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/GO/output_2/CPG"
+  file_paths <- c(
+    BP = file.path(base_path, paste0("CPG_transposable_element_", temp, "_BP.xlsx")),
+    CC = file.path(base_path, paste0("CPG_transposable_element_", temp, "_CC.xlsx")),
+    MF = file.path(base_path, paste0("CPG_transposable_element_", temp, "_MF.xlsx"))
+  )
+  
+  combined_df <- data.frame()
+  for (category in names(file_paths)) {
+    path <- file_paths[[category]]
+    if (file.exists(path)) {
+      df <- read_xlsx(path)
+      df$GO_category <- category
+      combined_df <- bind_rows(combined_df, df)
+      cat(paste("Loaded", category, "with", nrow(df), "terms\n"))
+    } else {
+      cat(paste("File not found:", path, "\n"))
+    }
+  }
+  
+  if (nrow(combined_df) == 0) {
+    cat("No enrichment data found — skipping.\n")
+    next
+  }
+  
+  df_filtered <- combined_df %>%
+    filter(
+      !is.na(p_value),
+      p_value < 0.05,
+      observed_gene_hits >= 3,
+      gene_set_size >= 5
+    ) %>%
+    mutate(
+      GeneRatio = observed_gene_hits / total_input_genes,
+      Count = observed_gene_hits,
+      pvalue = p_value,
+      description_with_category = paste0(description, " (", GO_category, ")"),
+      description_with_category = fct_reorder(description_with_category, GeneRatio)
+    ) %>%
+    arrange(p_value) %>%
+    slice_head(n = 20)
+  
+  if (nrow(df_filtered) == 0) {
+    cat("No significant GO terms found — skipping.\n")
+    next
+  }
+  
+  # Plot
+  p <- ggplot(df_filtered, aes(x = GeneRatio, y = description_with_category)) +
+    geom_point(aes(size = Count, color = pvalue)) +
+    scale_color_gradient(low = "red", high = "blue", name = "p-value") +
+    scale_size(range = c(3, 10), name = "Gene Count") +
+    theme_minimal(base_size = 12) +
+    labs(
+      title = "GO Enrichment",
+      subtitle = paste("CpG Transposable Elements at", temp),
+      x = "Gene Ratio",
+      y = NULL
+    ) +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      plot.subtitle = element_text(size = 12),
+      axis.text.y = element_text(size = 9),
+      legend.position = "right"
+    )
+  
+  print(p)
+  
+  # Save
+  ggsave(
+    filename = file.path(output_dir, paste0("GO_plot_CpG_", temp, ".png")),
+    plot = p, width = 12, height = 8, dpi = 300
+  )
+  cat(paste("Plot saved for CpG -", temp, "\n"))
+}
+
+```
+
+# All in one
+
+```{r}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(forcats)
+library(data.table)
+library(stringr)  
+
+contexts <- c("CHG", "CHH", "CpG")
+temperatures <- c("10C", "16C", "22C")
+combined_all <- data.frame()
+
+data_files <- list(
+  CHG = "/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/chg.txt.gz",
+  CHH = "/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/chh.txt.gz",
+  CpG = "/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/en_heatmaps/cpg.txt.gz"
+)
+
+for (context in contexts) {
+  ctx_data <- fread(data_files[[context]])
+  
+  for (temp in temperatures) {
+    jsd_col <- paste0("JSD_bit_", temp)
+    if (!jsd_col %in% colnames(ctx_data)) next
+    
+    significant_regions <- ctx_data %>%
+      filter(
+        class == "transposable_element",
+        !is.na(.data[[jsd_col]]),
+        .data[[jsd_col]] > 0.7
+      )
+    
+    total_input_genes <- length(unique(significant_regions$nearestTSS.gene_id))
+    if (total_input_genes == 0) next
+    
+    file_context <- ifelse(context == "CpG", "CPG", context)
+    base_path <- paste0("/shares/grossniklaus.botinst.uzh/eharputluoglu/Meth_heatmaps/GO/output_2/", file_context)
+    
+    file_paths <- c(
+      BP = file.path(base_path, paste0(file_context, "_transposable_element_", temp, "_BP.xlsx")),
+      CC = file.path(base_path, paste0(file_context, "_transposable_element_", temp, "_CC.xlsx")),
+      MF = file.path(base_path, paste0(file_context, "_transposable_element_", temp, "_MF.xlsx"))
+    )
+    
+    combined_df <- data.frame()
+    for (category in names(file_paths)) {
+      path <- file_paths[[category]]
+      if (file.exists(path)) {
+        df <- read_xlsx(path)
+        df$GO_category <- category
+        combined_df <- bind_rows(combined_df, df)
+      }
+    }
+    
+    if (nrow(combined_df) == 0) next
+    
+    df_filtered <- combined_df %>%
+      filter(
+        !is.na(p_value),
+        p_value < 0.05,
+        observed_gene_hits >= 3,
+        gene_set_size >= 5
+      ) %>%
+      mutate(
+        GeneRatio = observed_gene_hits / total_input_genes,
+        Count = observed_gene_hits,
+        pvalue = p_value,
+        description_wrapped = str_wrap(description, width = 45),  # no category
+        Context = context,
+        Temperature = temp
+      ) %>%
+      arrange(p_value) %>%
+      slice_head(n = 15)  # TOP 15
+          
+    combined_all <- bind_rows(combined_all, df_filtered)
+  }
+}
+
+combined_all$Context <- factor(combined_all$Context, levels = c("CHG", "CHH", "CpG"))
+combined_all$Temperature <- factor(combined_all$Temperature, levels = c("10C", "16C", "22C"))
+
+# Plot
+p <- ggplot(combined_all, aes(x = GeneRatio, y = fct_reorder(description_wrapped, GeneRatio))) +
+  geom_point(aes(size = Count, color = pvalue)) +
+  scale_color_gradient(low = "red", high = "blue", name = "p-value") +
+  scale_size(range = c(1.5, 5), name = "Gene Count") +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "GO Enrichment of TE Regions (Top 15 Terms)",
+    x = "Gene Ratio",
+    y = NULL
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    strip.text = element_text(size = 13),
+    axis.text.y = element_text(size = 5, hjust = 1),
+    legend.position = "right"
+  ) +
+  facet_grid(Temperature ~ Context, scales = "free_y", space = "free_y")
+
+ggsave("GO_plot_combined.pdf", p, width = 16, height = 12)
+ggsave("GO_plot_combined.png", p, width = 16, height = 12, dpi = 300)
+
+```
+
+
+```{r}
+
+library(ggplot2)
+library(forcats)
+library(stringr)
+
+combined_all$Context_Temp <- paste0(combined_all$Context, " ", combined_all$Temperature)
+combined_all$Context_Temp <- factor(combined_all$Context_Temp, 
+                                    levels = c("CHG 10C", "CHG 16C", "CHG 22C",
+                                               "CHH 10C", "CHH 16C", "CHH 22C",
+                                               "CpG 10C", "CpG 16C", "CpG 22C"))
+
+# Plot
+p <- ggplot(combined_all, aes(x = GeneRatio, y = fct_reorder(description_wrapped, GeneRatio))) +
+  geom_point(aes(size = Count, color = pvalue)) +
+  scale_color_gradient(low = "red", high = "blue", name = "p-value") +
+  scale_size(range = c(1.5, 5), name = "Gene Count") +
+  theme_minimal(base_size = 11) +
+  labs(
+    title = "GO Enrichment of TE Regions (Top 15 Terms)",
+    x = "Gene Ratio",
+    y = NULL
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    strip.text = element_text(size = 10),
+    axis.text.y = element_text(size = 5),
+    axis.text.x = element_text(size = 7),
+    legend.position = "bottom",
+    legend.box = "horizontal",
+    legend.text = element_text(size = 7),
+    legend.title = element_text(size = 8)
+  ) +
+  facet_wrap(~ Context_Temp, ncol = 3, scales = "free_y")
+
+ggsave("GO_plot_facet_wrap.pdf", p, width = 11, height = 10)
+ggsave("GO_plot_facet_wrap.png", p, width = 11, height = 10, dpi = 600)
+
+```
+

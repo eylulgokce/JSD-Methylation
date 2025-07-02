@@ -75,7 +75,7 @@ run_great <- function(gr, db, txdb = "TxDb.Athaliana.BioMart.plantsmart51"){
   l <- sum(!is.na(gr$JSD_bit) & gr$JSD_bit > 0.7, na.rm = TRUE)
   dmr <- NULL
   
-  if (l >= 5) {  # Need at least 5 regions for analysis
+  if (l >= 5) {  
     dmr <- gr[!is.na(gr$JSD_bit) & gr$JSD_bit > 0.7]
   } else {
     cat("Not enough significant regions for analysis\n")
@@ -103,7 +103,6 @@ run_great <- function(gr, db, txdb = "TxDb.Athaliana.BioMart.plantsmart51"){
 # Function to convert data to GRanges
 ```{r}
 create_granges <- function(data, temp_col, context_type) {
-
   data_filtered <- data[!is.na(data[[temp_col]]) & data[[temp_col]] > 0, ]
   
   if(nrow(data_filtered) == 0) {
@@ -111,7 +110,6 @@ create_granges <- function(data, temp_col, context_type) {
     return(NULL)
   }
   
-  # GRanges 
   gr <- GRanges(
     seqnames = data_filtered$chromosome,
     ranges = IRanges(start = data_filtered$location, width = 1),
@@ -120,7 +118,6 @@ create_granges <- function(data, temp_col, context_type) {
     class = data_filtered$class
   )
   
-  # add region names
   gr$name <- paste("region", 1:length(gr), sep = "_")
   
   return(gr)
@@ -154,24 +151,19 @@ for (context in contexts) {
 # Analysis by Temperature and Context
 
 ```{r, warning=FALSE, message=FALSE}
-
-
 temperatures <- c("10C", "16C", "22C")
 #genomic_regions <- c("intergenic", "promoter", "exon", "intron", "UTR")  
 
-# Create output directories
 dir.create("output", showWarnings = FALSE)
 for(context in contexts) {
   dir.create(paste0("output/", toupper(context)), showWarnings = FALSE, recursive = TRUE)
 }
 
-# for each context type
 for(context in contexts) {
   if(is.null(data_list[[context]])) next
   
   cat(paste("\n=== Processing", toupper(context), "context ===\n"))
   
-  # by Temperature
   cat("Analyzing by temperature...\n")
   for(temp in temperatures) {
     temp_col <- paste0("JSD_bit_", temp)
@@ -179,11 +171,9 @@ for(context in contexts) {
     if(temp_col %in% colnames(data_list[[context]])) {
       cat(paste("Processing", temp, "...\n"))
       
-      # GRanges for this temperature
       gr_temp <- create_granges(data_list[[context]], temp_col, context)
       
       if(!is.null(gr_temp) && length(gr_temp) >= 5) {
-        # Run rGREAT analysis
         res_temp <- list(
           BP = run_great(gr = gr_temp, db = "GO:BP"),
           MF = run_great(gr = gr_temp, db = "GO:MF"),
@@ -192,7 +182,6 @@ for(context in contexts) {
           Reactome = run_great(gr = gr_temp, db = reactome_pathways)
         )
         
-        # Save to .xlsx
         for(analysis_type in names(res_temp)) {
           if(nrow(res_temp[[analysis_type]]) > 0) {
             output_file <- paste0("output/", toupper(context), "/", 
@@ -208,13 +197,11 @@ for(context in contexts) {
   
   cat("Analyzing by genomic region for each temperature...\n")
   
-  # get unique genomic regions
   unique_classes <- unique(data_list[[context]]$class[!is.na(data_list[[context]]$class)])
   
   for(region in unique_classes) {
     cat(paste("Processing", region, "regions...\n"))
     
-    # filter for this genomic region
     region_data <- data_list[[context]][data_list[[context]]$class == region & 
                                        !is.na(data_list[[context]]$class), ]
     
@@ -223,14 +210,12 @@ for(context in contexts) {
       next
     }
     
-    # each temperature separately for this genomic region
     for(temp in temperatures) {
       temp_col <- paste0("JSD_bit_", temp)
       
       if(temp_col %in% colnames(region_data)) {
         cat(paste("Processing", region, "at", temp, "...\n"))
         
-        # GRanges for this region and temperature
         valid_indices <- !is.na(region_data[[temp_col]]) & 
                         !is.nan(region_data[[temp_col]]) & 
                         region_data[[temp_col]] > 0
@@ -252,7 +237,6 @@ for(context in contexts) {
         
         gr_region_temp$name <- paste("region", 1:length(gr_region_temp), sep = "_")
         
-        # rGREAT 
         res_region_temp <- list(
           BP = run_great(gr = gr_region_temp, db = "GO:BP"),
           MF = run_great(gr = gr_region_temp, db = "GO:MF"),

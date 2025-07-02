@@ -1,0 +1,14 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.png
+*.jpeg
+*.jpg
+*.pdf
+*.xlsx
+paper/_book
+paper/_main_files
+paper/paper_bookdown/.Rproj.user
+paper/paper_bookdown/.Rproj.user
+paper/paper_bookdown/.Rproj.user
