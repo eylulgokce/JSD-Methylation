@@ -2,16 +2,47 @@
 # preprocessing.py
 
 """Functions for preprocessing data.
+
+This module provides utilities for data preprocessing including imputation
+and filename generation.
 """
 
+import logging
+from typing import Union, List, Tuple, Optional
 
-def impute(data, method='pseudocount'):
+# Configure module logger
+logger = logging.getLogger(__name__)
+
+
+def impute(data: Optional[any] = None, method: str = 'pseudocount') -> Union[int, float]:
     """Imputes missing values of a data frame.
+    
+    Args:
+        data: Data to impute (currently unused)
+        method: Imputation method (default: 'pseudocount')
+        
+    Returns:
+        Imputation value
+        
+    Raises:
+        ValueError: If method is not supported
     """
-    if method == 'pseudocount':
-        # given by the parameters of a uninformative Dirichlet prior on the
-        # probabilities
-        return 1
+    logger.debug(f"Imputing missing values using method: {method}")
+    
+    if method not in ['pseudocount']:
+        raise ValueError(f"Unsupported imputation method: {method}")
+    
+    try:
+        if method == 'pseudocount':
+            # given by the parameters of a uninformative Dirichlet prior on the
+            # probabilities
+            impute_value = 1
+            logger.debug(f"Using pseudocount imputation value: {impute_value}")
+            return impute_value
+    except Exception as e:
+        logger.error(f"Error in imputation: {e}")
+        raise RuntimeError(f"Imputation failed: {e}")
+
 
 def groupname(by=None, name=None, fname=None):
     """Return filename of the subgroup.
