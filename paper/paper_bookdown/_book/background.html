@@ -4,13 +4,13 @@
 
   <meta charset="utf-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <title>References | A Minimal Book Example</title>
+  <title>Chapter 2 Background | A Minimal Book Example</title>
   <meta name="description" content="<p>This is a minimal example of using the bookdown package to write a book.
 The HTML output format for this example is bookdown::gitbook,
 set in the _output.yml file.</p>" />
   <meta name="generator" content="bookdown 0.43 and GitBook 2.6.7" />
 
-  <meta property="og:title" content="References | A Minimal Book Example" />
+  <meta property="og:title" content="Chapter 2 Background | A Minimal Book Example" />
   <meta property="og:type" content="book" />
   
   <meta property="og:description" content="<p>This is a minimal example of using the bookdown package to write a book.
@@ -19,7 +19,7 @@ set in the _output.yml file.</p>" />
   <meta name="github-repo" content="rstudio/bookdown-demo" />
 
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="References | A Minimal Book Example" />
+  <meta name="twitter:title" content="Chapter 2 Background | A Minimal Book Example" />
   
   <meta name="twitter:description" content="<p>This is a minimal example of using the bookdown package to write a book.
 The HTML output format for this example is bookdown::gitbook,
@@ -36,8 +36,8 @@ set in the _output.yml file.</p>" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   
   
-<link rel="prev" href="limitations.html"/>
-
+<link rel="prev" href="index.html"/>
+<link rel="next" href="results.html"/>
 <script src="libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.4.6/dist/fuse.min.js"></script>
 <link href="libs/gitbook-2.6.7/css/style.css" rel="stylesheet" />
@@ -200,37 +200,64 @@ div.csl-indent {
           <div class="page-inner">
 
             <section class="normal" id="section-">
-<div id="references" class="section level1 unnumbered hasAnchor">
-<h1>References<a href="references.html#references" class="anchor-section" aria-label="Anchor link to header"></a></h1>
+<div id="background" class="section level1 hasAnchor" number="2">
+<h1><span class="header-section-number">Chapter 2</span> Background<a href="background.html#background" class="anchor-section" aria-label="Anchor link to header"></a></h1>
+<p>Understanding how gene expression is regulated across different tissues, cell types, and environments is a major focus of modern plant biology. DNA methylation, a biochemical mark involving the addition of a methyl group to cytosine bases, plays an important role in shaping gene expression, maintaining genome stability, and silencing transposable elements <span class="citation">(<a href="#ref-law_establishing_2010">Law and Jacobsen 2010</a>; <a href="#ref-slotkin_transposable_2007">Slotkin and Martienssen 2007</a>)</span>.Understanding these mechanisms is essential for dissecting how epigenetic marks evolve and vary across populations.</p>
+<p>In plants, DNA methylation is more complex than in mammals. It occurs in three sequence contexts: CG, CHG, and CHH (where H = A, T, or C), each maintained by different enzymatic pathways <span class="citation">(<a href="#ref-law_establishing_2010">Law and Jacobsen 2010</a>)</span>. For instance, CG methylation is maintained by MET1, CHG by CMT3, and CHH methylation, often found in transposable elements, is established de novo by the RNA-directed DNA methylation (RdDM) pathway <span class="citation">(<a href="#ref-slotkin_transposable_2007">Slotkin and Martienssen 2007</a>)</span>. These patterns are not only vital for gene regulation but are also tightly linked to developmental processes and stress responses <span class="citation">(<a href="#ref-lister_highly_2008">Lister et al. 2008</a>; <a href="#ref-lamke_epigenetic_2017">Lämke and Bäurle 2017</a>)</span>.</p>
+<p>Large-scale efforts such as the 1001 Epigenomes Project <span class="citation">(<a href="#ref-kawakatsu_epigenomic_2016">Kawakatsu et al. 2016</a>)</span> have mapped DNA methylation at single-base resolution across <em>Arabidopsis thaliana</em> accessions using whole-genome bisulfite sequencing (WGBS). This method relies on sodium bisulfite treatment, which converts unmethylated cytosines to uracil while leaving methylated cytosines unchanged, enabling the precise detection of methylation states at cytosine residues <span class="citation">(<a href="#ref-cokus_shotgun_2008">Cokus et al. 2008</a>; <a href="#ref-lister_highly_2008">Lister et al. 2008</a>)</span>. These resources allow researchers to study methylation variability across populations and to identify loci with stable versus dynamic methylation states. Such variation has been linked to adaptive traits <span class="citation">(<a href="#ref-schmid_contribution_2018">Schmid et al. 2018</a>)</span>, indicating that DNA methylation could act as a substrate for natural selection.</p>
+<p>Despite this growing interest, tools to quantify epigenomic diversity across individuals have lagged behind those used in genetics. In their study, Kartal et al. <span class="citation">(<a href="#ref-kartal_cell_2019">Kartal, Schmid, and Grossniklaus 2019</a>)</span> noted that while population genetics commonly uses metrics such as F<sub>ST</sub> to detect genomic regions under selection or differentiation <span class="citation">(<a href="#ref-holsinger_genetics_2009">Holsinger and Weir 2009</a>)</span>, these approaches are not well-suited to capture the continuous and multi-sample nature of methylation data. To address this, they introduced Jensen–Shannon divergence (JSD) as a threshold-free, information-theoretic measure to quantify methylation divergence across samples. JSD is symmetric and bounded, and it reflects how much the methylation distribution at a given site varies across individuals. In practical terms, cytosines that are consistently methylated or unmethylated across samples have low JSD, whereas cytosines with variable methylation states exhibit high JSD. This makes it possible to scan the genome for divergent epigenetic loci without requiring parametric assumptions.</p>
+<p>The strength of JSD lies in its flexibility: it can be applied to methylation data from tissues, cell types, or populations. When combined with methylation rate (MET), JSD can also reveal biologically meaningful site categories that reflect both stability and variability in epigenetic regulation <span class="citation">(<a href="#ref-kartal_cell_2019">Kartal, Schmid, and Grossniklaus 2019</a>)</span>. Specifically, we define the following categories:</p>
+<ul>
+<li>LMC (Lowly Methylated Cytosines): MET &lt; 0.2<br />
+</li>
+<li>HMC (Highly Methylated Cytosines): MET &gt; 0.8<br />
+</li>
+<li>MMC (Mid-Methylated Cytosines): MET between 0.2 and 0.8, JSD ≤ 0.7<br />
+</li>
+<li>MSC (Metastable Cytosines): MET between 0.2 and 0.8, JSD &gt; 0.7</li>
+</ul>
+<p>These site categories help distinguish between constitutive methylation patterns (LMC and HMC) and more variable or potentially regulatory ones (MMC and MSC). In particular, MSC sites may reflect epigenetic plasticity, stochastic switching or environmental responsiveness <span class="citation">(<a href="#ref-kartal_cell_2019">Kartal, Schmid, and Grossniklaus 2019</a>)</span>. While JSD identifies divergent loci, further analysis is needed to determine their regulatory or adaptive significance.</p>
+<p>Transposable elements (TEs), which make up a significant portion of the <em>Arabidopsis</em> genome, are a primary target of DNA methylation and silencing mechanisms <span class="citation">(<a href="#ref-slotkin_transposable_2007">Slotkin and Martienssen 2007</a>)</span>. The methylation of TEs is not only critical for suppressing their potential mobility but also for safeguarding nearby gene regulation. Previous studies have shown that TEs are hotspots of epigenetic variability, making them informative targets for studying methylation divergence across populations <span class="citation">(<a href="#ref-zhang_genome"><strong>zhang_genome?</strong></a>; <a href="#ref-kartal_cell_2019">Kartal, Schmid, and Grossniklaus 2019</a>)</span>.</p>
+<p>In this study, we use whole-genome bisulfite sequencing data from the 1001 Epigenomes Project <span class="citation">(<a href="#ref-kawakatsu_epigenomic_2016">Kawakatsu et al. 2016</a>)</span>, which profiled DNA methylation across hundreds of <em>A. thaliana</em> accessions originating from diverse geographic and climatic backgrounds. This global sampling allows us to investigate methylation divergence across natural populations with broad environmental relevance.</p>
+<p>To quantify divergence, we adopt the same Jensen–Shannon divergence (JSD) approach introduced by Kartal et al. <span class="citation">(<a href="#ref-kartal_cell_2019">Kartal, Schmid, and Grossniklaus 2019</a>)</span>, which we re-implemented in R. This method allows us to scan the genome for cytosines that show high methylation variability across accessions. We apply it across all three context types (CG, CHG, CHH) to ensure a comprehensive view of methylome dynamics.</p>
+<p>By focusing on TEs and their flanking regions, we aim to better understand how epigenomic diversity is structured across the genome and potentially linked to adaptation and gene regulation.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="background.html#cb1-1" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">include_graphics</span>(<span class="st">&quot;figures/fig1.png&quot;</span>)</span></code></pre></div>
+<div class="figure"><span style="display:block;" id="fig:fig1"></span>
+<img src="figures/fig1.png" alt="(A) Geographic distribution of Arabidopsis accessions from the 1001 Epigenomes Project. (B) Overview of the analysis pipeline for calculating methylation divergence using JSD. (C) Entropy-based classification of methylation sites into LMC, MMC, MSC, and HMC categories with example heatmaps." width="100%" />
+<p class="caption">
+Figure 2.1: (A) Geographic distribution of Arabidopsis accessions from the 1001 Epigenomes Project. (B) Overview of the analysis pipeline for calculating methylation divergence using JSD. (C) Entropy-based classification of methylation sites into LMC, MMC, MSC, and HMC categories with example heatmaps.
+</p>
+</div>
 
+</div>
+<h3>References<a href="references.html#references" class="anchor-section" aria-label="Anchor link to header"></a></h3>
 <div id="refs" class="references csl-bib-body hanging-indent" entry-spacing="0">
-<div class="csl-entry">
+<div id="ref-cokus_shotgun_2008" class="csl-entry">
 Cokus, Shawn J., Sha Feng, Xiaoyu Zhang, Zheng Chen, Barry Merriman, Christian D. Haudenschild, Sriharsa Pradhan, S. Floyd Nelson, Matteo Pellegrini, and Steven E. Jacobsen. 2008. <span>“Shotgun Bisulphite Sequencing of the <span>Arabidopsis</span> Genome Reveals <span>DNA</span> Methylation Patterning.”</span> <em>Nature</em> 452 (7184): 215–19. <a href="https://doi.org/10.1038/nature06745">https://doi.org/10.1038/nature06745</a>.
 </div>
-<div class="csl-entry">
+<div id="ref-holsinger_genetics_2009" class="csl-entry">
 Holsinger, Kent E., and Bruce S. Weir. 2009. <span>“Genetics in Geographically Structured Populations: Defining, Estimating and Interpreting <span>F</span>(<span>ST</span>).”</span> <em>Nature Reviews. Genetics</em> 10 (9): 639–50. <a href="https://doi.org/10.1038/nrg2611">https://doi.org/10.1038/nrg2611</a>.
 </div>
-<div class="csl-entry">
+<div id="ref-kartal_cell_2019" class="csl-entry">
 Kartal, Önder, Marc W. Schmid, and Ueli Grossniklaus. 2019. <span>“Cell <span>Type</span>-Specific <span>Genome</span> <span>Scans</span> of <span>DNA</span> <span>Methylation</span> <span>Diversity</span> <span>Indicate</span> an <span>Important</span> <span>Role</span> for <span>Transposable</span> <span>Elements</span>.”</span> bioRxiv. <a href="https://doi.org/10.1101/801233">https://doi.org/10.1101/801233</a>.
 </div>
-<div class="csl-entry">
+<div id="ref-kawakatsu_epigenomic_2016" class="csl-entry">
 Kawakatsu, Taiji, Shao-shan Carol Huang, Florian Jupe, Eriko Sasaki, Robert J. Schmitz, Mark A. Urich, Rosa Castanon, et al. 2016. <span>“Epigenomic <span>Diversity</span> in a <span>Global</span> <span>Collection</span> of <span>Arabidopsis</span> Thaliana <span>Accessions</span>.”</span> <em>Cell</em> 166 (2): 492–505. <a href="https://doi.org/10.1016/j.cell.2016.06.044">https://doi.org/10.1016/j.cell.2016.06.044</a>.
 </div>
-<div class="csl-entry">
+<div id="ref-lamke_epigenetic_2017" class="csl-entry">
 Lämke, Jörn, and Isabel Bäurle. 2017. <span>“Epigenetic and Chromatin-Based Mechanisms in Environmental Stress Adaptation and Stress Memory in Plants.”</span> <em>Genome Biology</em> 18 (1): 124. <a href="https://doi.org/10.1186/s13059-017-1263-6">https://doi.org/10.1186/s13059-017-1263-6</a>.
 </div>
-<div class="csl-entry">
+<div id="ref-law_establishing_2010" class="csl-entry">
 Law, Julie A., and Steven E. Jacobsen. 2010. <span>“Establishing, Maintaining and Modifying <span>DNA</span> Methylation Patterns in Plants and Animals.”</span> <em>Nature Reviews Genetics</em> 11 (3): 204–20. <a href="https://doi.org/10.1038/nrg2719">https://doi.org/10.1038/nrg2719</a>.
 </div>
-<div class="csl-entry">
+<div id="ref-lister_highly_2008" class="csl-entry">
 Lister, Ryan, Ronan C. O’Malley, Julian Tonti-Filippini, Brian D. Gregory, Charles C. Berry, A. Harvey Millar, and Joseph R. Ecker. 2008. <span>“Highly <span>Integrated</span> <span>Single</span>-<span>Base</span> <span>Resolution</span> <span>Maps</span> of the <span>Epigenome</span> in <span>Arabidopsis</span>.”</span> <em>Cell</em> 133 (3): 523–36. <a href="https://doi.org/10.1016/j.cell.2008.03.029">https://doi.org/10.1016/j.cell.2008.03.029</a>.
 </div>
-<div class="csl-entry">
+<div id="ref-schmid_contribution_2018" class="csl-entry">
 Schmid, Marc W., Christian Heichinger, Diana Coman Schmid, Daniela Guthörl, Valeria Gagliardini, Rémy Bruggmann, Sirisha Aluri, et al. 2018. <span>“Contribution of Epigenetic Variation to Adaptation in <span>Arabidopsis</span>.”</span> <em>Nature Communications</em> 9 (1): 4446. <a href="https://doi.org/10.1038/s41467-018-06932-5">https://doi.org/10.1038/s41467-018-06932-5</a>.
 </div>
-<div class="csl-entry">
+<div id="ref-slotkin_transposable_2007" class="csl-entry">
 Slotkin, R. Keith, and Robert Martienssen. 2007. <span>“Transposable Elements and the Epigenetic Regulation of the Genome.”</span> <em>Nature Reviews Genetics</em> 8 (4): 272–85. <a href="https://doi.org/10.1038/nrg2072">https://doi.org/10.1038/nrg2072</a>.
-</div>
 </div>
 </div>
             </section>
@@ -238,8 +265,8 @@ Slotkin, R. Keith, and Robert Martienssen. 2007. <span>“Transposable Elements 
           </div>
         </div>
       </div>
-<a href="limitations.html" class="navigation navigation-prev navigation-unique" aria-label="Previous page"><i class="fa fa-angle-left"></i></a>
-
+<a href="index.html" class="navigation navigation-prev " aria-label="Previous page"><i class="fa fa-angle-left"></i></a>
+<a href="results.html" class="navigation navigation-next " aria-label="Next page"><i class="fa fa-angle-right"></i></a>
     </div>
   </div>
 <script src="libs/gitbook-2.6.7/js/app.min.js"></script>
@@ -270,7 +297,7 @@ gitbook.start({
     "size": 2
   },
   "edit": {
-    "link": "https://github.com/USERNAME/REPO/edit/BRANCH/07-references.Rmd",
+    "link": "https://github.com/USERNAME/REPO/edit/BRANCH/01-background.Rmd",
     "text": "Edit"
   },
   "history": {

@@ -1,76 +1,34 @@
-
 # Methods
 
-## Jensen-Shannon Divergence for Methylation Analysis
+## Jensen–Shannon Divergence for Methylation Analysis
 
-Jensen-Shannon Divergence (JSD) is an information-theoretic measure based on Shannon entropy [@Shannon1948] that quantifies the difference between probability distributions. It has been widely used in genomic sequence analysis [@Grosse2002] and was applied to DNA methylation by [@Kartal2020].
+Jensen–Shannon Divergence (JSD) is a widely used information-theoretic metric for measuring the similarity—or, more precisely, the divergence—between probability distributions. It is derived from Shannon entropy [@Shannon1948] and has favorable properties such as symmetry and boundedness, making it useful for biological applications. In the context of genomics, JSD has been used to characterize variability in symbolic sequences [@Grosse2002] and more recently adapted for site-level methylation analysis [@Kartal2020].
 
-We used the method described in [@Kartal2020] to compute JSD from methylation counts across samples. This approach estimates JSD using the plug-in estimator, where probabilities are replaced by observed frequencies. Given read counts for methylated and unmethylated states at each genomic position, the JSD is calculated as:
+To estimate methylation divergence across samples, we followed the empirical, non-parametric approach of [@Kartal2020], applying a plug-in estimator to site-wise methylation counts. Each cytosine site was treated as a binary outcome (methylated or unmethylated), and per-sample read counts were used to compute empirical distributions and sample weights. For each genomic position \\( i \\), the JSD is calculated as:
 
 $$
 D_i = H\left( \sum_j \pi_{ij} P_{ij} \right) - \sum_j \pi_{ij} H(P_{ij})
 $$
 
-where $P_{ij}$ is the estimated probability distribution for sample $j$, and $\pi_{ij}$ is the sample weight based on read coverage:
+where:
 
-$$
-P_{ij} = \frac{1}{n_{ij}} \cdot (n_{ij1}, n_{ij2})
-$$
+-   \\( P\_{ij} = \\frac{1}{n\_{ij}} (n\_{ij1}, n\_{ij2}) \\) represents the proportion of methylated (\\( n\_{ij1} \\)) and unmethylated (\\( n\_{ij2} \\)) reads for sample \\( j \\),
+-   \\( \\pi\_{ij} = \\frac{n\_{ij}}{n_i} \\) is the sample-specific weight based on total coverage,
+-   \\( n_i = \\sum_j n\_{ij} \\) is the total number of reads across all samples at position \\( i \\),
+-   \\( H(P) = -\\sum_k P_k \\log_2 P_k \\) is the Shannon entropy in bits.
 
-$$
-\pi_{ij} = \frac{n_{ij}}{n_i}
-$$
+The JSD takes values between 0 (no divergence) and 1 (maximum divergence for binary distributions).To avoid numerical instability caused by zero-probability entries, we followed the strategy described by [@Kartal2020], which avoids undefined entropy terms without applying averaging.
 
-with $n_{ij}$ as the total read count for sample $j$ at position $i$, and $n_i$ as the total coverage across samples.
+Our implementation closely followed the algorithmic structure proposed in [@Kartal2020]. Vectorized operations ensured that the computation scaled to thousands of methylomes and millions of genomic sites.
 
-To implement this, we adapted the source code from [@Kartal2020] and made minor modifications to optimize it for our dataset. These changes ensured compatibility with our sample structure while preserving the original methodology. The calculations were performed in R, using custom functions to efficiently compute JSD across genomic positions.
+## Data Preprocessing (Methylator Framework)
 
+To prepare the DNA methylation data for analysis, we used the **Methylator** framework developed in the lab of Prof. Ueli Grossniklaus. This pipeline integrates quality control, preprocessing, alignment, and methylation calling to ensure consistency and high-quality results across large-scale bisulfite sequencing datasets.
 
+Sequencing reads were initially retrieved from the Sequence Read Archive (SRA), and sample metadata were curated to maintain consistency across accessions. The raw reads underwent quality assessment using **FastQC**, which evaluated sequencing quality metrics such as per-base quality scores, sequence duplication levels, and GC content. Reads failing to meet quality thresholds were then processed using **TrimGalore**, which removes low-quality bases (Q \< 30), sequencing adapters, and undetected nucleotides (Ns). To further refine the data, duplicate reads were filtered out, and for samples with multiple sequencing runs, all reads were merged using **Clumpify**.
 
+The cleaned reads were then aligned to the *Arabidopsis thaliana* TAIR10 reference genome using **Bismark**, employing a two-step alignment strategy within the “Dirty-Harry” module of the Methylator framework. First, an end-to-end alignment was attempted for all reads. Reads that failed this initial alignment were then realigned using a local alignment mode. Methylation calls were generated for both alignment sets and subsequently merged to create a comprehensive methylation profile for each sample.
 
+Following alignment and methylation calling, the resulting data were post-processed to ensure completeness and coverage consistency. Samples with insufficient coverage or inconsistent methylation patterns were flagged for exclusion. Finally, all methylomes were harmonized by intersecting cytosine positions across samples, enabling accurate and site-resolved divergence analysis.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## Equations
-
-Here is an equation.
-
-\begin{equation} 
-  f\left(k\right) = \binom{n}{k} p^k\left(1-p\right)^{n-k}
-  (\#eq:binom)
-\end{equation} 
-
-You may refer to using `\@ref(eq:binom)`, like see Equation \@ref(eq:binom).
-
-
-## Theorems and proofs
-
-Labeled theorems can be referenced in text using `\@ref(thm:tri)`, for example, check out this smart theorem \@ref(thm:tri).
-
-::: {.theorem #tri}
-For a right triangle, if $c$ denotes the *length* of the hypotenuse
-and $a$ and $b$ denote the lengths of the **other** two sides, we have
-$$a^2 + b^2 = c^2$$
-:::
-
-Read more here <https://bookdown.org/yihui/bookdown/markdown-extensions-by-bookdown.html>.
-
-## Callout blocks
-
-
-The R Markdown Cookbook provides more help on how to use custom blocks to design your own callouts: https://bookdown.org/yihui/rmarkdown-cookbook/custom-blocks.html
+## Data Analysis

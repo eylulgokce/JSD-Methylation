@@ -1,0 +1,30 @@
+# Background
+
+Understanding how gene expression is regulated across different tissues, cell types, and environments is a major focus of modern plant biology. DNA methylation, a biochemical mark involving the addition of a methyl group to cytosine bases, plays an important role in shaping gene expression, maintaining genome stability, and silencing transposable elements [@law_establishing_2010; @slotkin_transposable_2007].Understanding these mechanisms is essential for dissecting how epigenetic marks evolve and vary across populations.
+
+In plants, DNA methylation is more complex than in mammals. It occurs in three sequence contexts: CG, CHG, and CHH (where H = A, T, or C), each maintained by different enzymatic pathways [@law_establishing_2010]. For instance, CG methylation is maintained by MET1, CHG by CMT3, and CHH methylation, often found in transposable elements, is established de novo by the RNA-directed DNA methylation (RdDM) pathway [@slotkin_transposable_2007]. These patterns are not only vital for gene regulation but are also tightly linked to developmental processes and stress responses [@lister_highly_2008; @lamke_epigenetic_2017].
+
+Large-scale efforts such as the 1001 Epigenomes Project [@kawakatsu_epigenomic_2016] have mapped DNA methylation at single-base resolution across *Arabidopsis thaliana* accessions using whole-genome bisulfite sequencing (WGBS). This method relies on sodium bisulfite treatment, which converts unmethylated cytosines to uracil while leaving methylated cytosines unchanged, enabling the precise detection of methylation states at cytosine residues [@cokus_shotgun_2008; @lister_highly_2008]. These resources allow researchers to study methylation variability across populations and to identify loci with stable versus dynamic methylation states. Such variation has been linked to adaptive traits [@schmid_contribution_2018], indicating that DNA methylation could act as a substrate for natural selection.
+
+Despite this growing interest, tools to quantify epigenomic diversity across individuals have lagged behind those used in genetics. In their study, Kartal et al. [@kartal_cell_2019] noted that while population genetics commonly uses metrics such as F<sub>ST</sub> to detect genomic regions under selection or differentiation [@holsinger_genetics_2009], these approaches are not well-suited to capture the continuous and multi-sample nature of methylation data. To address this, they introduced Jensen–Shannon divergence (JSD) as a threshold-free, information-theoretic measure to quantify methylation divergence across samples. JSD is symmetric and bounded, and it reflects how much the methylation distribution at a given site varies across individuals. In practical terms, cytosines that are consistently methylated or unmethylated across samples have low JSD, whereas cytosines with variable methylation states exhibit high JSD. This makes it possible to scan the genome for divergent epigenetic loci without requiring parametric assumptions.
+
+The strength of JSD lies in its flexibility: it can be applied to methylation data from tissues, cell types, or populations. When combined with methylation rate (MET), JSD can also reveal biologically meaningful site categories that reflect both stability and variability in epigenetic regulation [@kartal_cell_2019]. Specifically, we define the following categories:
+
+-   LMC (Lowly Methylated Cytosines): MET \< 0.2\
+-   HMC (Highly Methylated Cytosines): MET \> 0.8\
+-   MMC (Mid-Methylated Cytosines): MET between 0.2 and 0.8, JSD ≤ 0.7\
+-   MSC (Metastable Cytosines): MET between 0.2 and 0.8, JSD \> 0.7
+
+These site categories help distinguish between constitutive methylation patterns (LMC and HMC) and more variable or potentially regulatory ones (MMC and MSC). In particular, MSC sites may reflect epigenetic plasticity, stochastic switching or environmental responsiveness [@kartal_cell_2019]. While JSD identifies divergent loci, further analysis is needed to determine their regulatory or adaptive significance.
+
+Transposable elements (TEs), which make up a significant portion of the *Arabidopsis* genome, are a primary target of DNA methylation and silencing mechanisms [@slotkin_transposable_2007]. The methylation of TEs is not only critical for suppressing their potential mobility but also for safeguarding nearby gene regulation. Previous studies have shown that TEs are hotspots of epigenetic variability, making them informative targets for studying methylation divergence across populations [@zhang_genome; @kartal_cell_2019].
+
+In this study, we use whole-genome bisulfite sequencing data from the 1001 Epigenomes Project [@kawakatsu_epigenomic_2016], which profiled DNA methylation across hundreds of *A. thaliana* accessions originating from diverse geographic and climatic backgrounds. This global sampling allows us to investigate methylation divergence across natural populations with broad environmental relevance.
+
+To quantify divergence, we adopt the same Jensen–Shannon divergence (JSD) approach introduced by Kartal et al. [@kartal_cell_2019], which we re-implemented in R. This method allows us to scan the genome for cytosines that show high methylation variability across accessions. We apply it across all three context types (CG, CHG, CHH) to ensure a comprehensive view of methylome dynamics.
+
+By focusing on TEs and their flanking regions, we aim to better understand how epigenomic diversity is structured across the genome and potentially linked to adaptation and gene regulation.
+
+```{r fig1, fig.cap="(A) Geographic distribution of Arabidopsis accessions from the 1001 Epigenomes Project. (B) Overview of the analysis pipeline for calculating methylation divergence using JSD. (C) Entropy-based classification of methylation sites into LMC, MMC, MSC, and HMC categories with example heatmaps.", out.width="100%"}
+knitr::include_graphics("figures/fig1.png")
+```
