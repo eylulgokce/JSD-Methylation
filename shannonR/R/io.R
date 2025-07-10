@@ -16,7 +16,6 @@ NULL
 #' data <- bedcount_reader("example.bedcount")
 #' }
 bedcount_reader <- function(bedcount, compression = NULL, chunksize = 10000) {
-  # Read the file with appropriate settings
   data <- read.table(bedcount,
                      header = TRUE,
                      sep = "\t",
@@ -34,16 +33,11 @@ bedcount_reader <- function(bedcount, compression = NULL, chunksize = 10000) {
 #' @param relation Relation for grouping (default: NULL)
 #' @return List with reference and qset components
 #' @export
-#' @examples
-#' \dontrun{
-#' pop <- population_filter("metadata.txt", subset = "condition == 'treated'")
-#' }
 population_filter <- function(metadata, subset = NULL, relation = NULL) {
   pop <- list(reference = NULL, qset = NULL)
   meta <- read.table(metadata, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
 
   if (!is.null(subset)) {
-    # Simple subset evaluation - in practice you might want more sophisticated parsing
     pop$reference <- meta$sample[eval(parse(text = subset), envir = meta)]
   } else {
     pop$reference <- meta$sample

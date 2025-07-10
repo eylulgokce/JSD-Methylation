@@ -13,37 +13,28 @@ NULL
 #' @return A list containing progress percentages and regions
 #' @export
 get_regions <- function(tabixfiles, chrom = NULL, exp_numsites = 1000) {
-
   if (is.null(chrom)) {
     stop("Chromosome must be specified")
   }
 
   sup_position <- supremum_position(tabixfiles, chrom)
-
   if (is.null(sup_position)) {
     message("Skipping because chromosome is missing.")
     return(list(progress = NULL, regions = NULL))
   }
 
   sup_numsites <- supremum_numsites(tabixfiles, chrom)
-
   if (is.null(sup_numsites) || sup_numsites == 0) {
     message("Skipping because there are no entries.")
     return(list(progress = NULL, regions = NULL))
   }
 
   step <- ceiling(sup_position / sup_numsites * exp_numsites)
+  stepsize <- min(step, sup_position)
 
-  if (step < sup_position) {
-    stepsize <- step
-  } else {
-    stepsize <- sup_position
-  }
+  pos_start <- seq(0, sup_position, by = stepsize + 1)
+  pos_end <- c(seq(stepsize, sup_position, by = stepsize + 1), sup_position)
 
-  pos_start <- seq(0, sup_position - 1, by = stepsize + 1)
-  pos_end <- c(seq(stepsize, sup_position - 1, by = stepsize + 1), sup_position)
-
-  # Ensure pos_end has same length as pos_start
   if (length(pos_end) > length(pos_start)) {
     pos_end <- pos_end[1:length(pos_start)]
   }
@@ -59,6 +50,7 @@ get_regions <- function(tabixfiles, chrom = NULL, exp_numsites = 1000) {
 
   return(list(progress = progress, regions = regions))
 }
+
 
 #' Get Data from Tabix Files
 #'
@@ -130,7 +122,15 @@ get_data <- function(files, labels = NULL, data_columns = NULL, regions = NULL,
 
           # Determine which columns to read
           all_cols <- c(index_cols, data_columns[[j]])
-          all_names <- c(index_names, paste0("col_", data_columns[[j]]))
+          features <- c("mC", "C")
+
+          # Clean sample label to avoid multiple dots (e.g., "SRX1.sample" → "SRX1_sample")
+          clean_label <- gsub("\\.", "_", labels[j])
+
+          # Create correct column names like "SRX1_sample.mC", "SRX1_sample.C"
+          data_feature_names <- paste0(clean_label, ".", features)
+          all_names <- c(index_names, data_feature_names)
+
 
           # Read the data
           df <- read.table(con, sep = "\t", header = FALSE,

@@ -1,210 +1,221 @@
 #' Shannon Entropy Estimation
 #'
-#' Computes Shannon entropy (in nats) of the feature frequency profile using the plug-in estimator.
+#' Computes Shannon entropy (in nat) of the feature frequency profile using the plug-in estimator.
 #'
 #' @param countmatrix A matrix of counts
 #' @param axis Integer indicating which axis to compute entropy along (1 for rows, 2 for columns)
-#' @param method Character string indicating the estimation method (currently only "plug-in" is supported)
+#' @param method Character string indicating the estimation method
 #' @return A vector of Shannon entropy values
 #' @export
 
+library(dplyr)
+library(tidyr)
+library(tibble)
 
 shannon_entropy <- function(countmatrix, axis = 1, method = "plug-in") {
-  if (method != "plug-in") {
-    stop("Only 'plug-in' method is currently supported")
-  }
+  if (method != "plug-in") stop("Only 'plug-in' method is currently supported")
+  if (is.null(countmatrix)) stop("Count matrix cannot be NULL")
 
+  # Convert to matrix and handle NA
   countmatrix <- as.matrix(countmatrix)
+  countmatrix[is.na(countmatrix)] <- 0
 
-  if (is.null(countmatrix) || length(dim(countmatrix)) != 2 || any(dim(countmatrix) == 0)) {
-    return(rep(NA_real_, max(1, nrow(countmatrix))))
+  # Handle 1D or invalid input
+  if (is.vector(countmatrix) || length(dim(countmatrix)) < 2 || min(dim(countmatrix)) < 2) {
+    n <- if (is.vector(countmatrix)) length(countmatrix) else if (axis == 1) nrow(countmatrix) else ncol(countmatrix)
+    if (n == 0) return(numeric(0))
+    return(rep(0, n)) # Return zeros for invalid cases
   }
 
+  # Ensure numeric
   countmatrix <- apply(countmatrix, 2, as.numeric)
 
-  if (axis == 1) {
-    count_distribution <- rowSums(countmatrix, na.rm = TRUE)
-    prob <- countmatrix / count_distribution
-  } else {
-    count_distribution <- colSums(countmatrix, na.rm = TRUE)
-    prob <- t(t(countmatrix) / count_distribution)
-  }
+  # Compute count distribution
+  count_distribution <- if (axis == 1) rowSums(countmatrix) else colSums(countmatrix)
+  n <- length(count_distribution)
+  entropy <- rep(0, n)
 
+  # Avoid division by zero
+  count_distribution[count_distribution == 0] <- 1
+
+  # Normalize to probabilities
+  prob <- if (axis == 1) countmatrix / count_distribution else t(t(countmatrix) / count_distribution)
   prob[is.nan(prob) | is.infinite(prob)] <- 0
+
+  # Compute entropy in nats
   entropy_terms <- ifelse(prob > 0, -prob * log(prob), 0)
+  entropy_vals <- if (axis == 1) rowSums(entropy_terms) else colSums(entropy_terms)
+  entropy <- entropy_vals
+  entropy[is.nan(entropy) | is.infinite(entropy)] <- 0
 
-  if (axis == 1) {
-    entropy <- rowSums(entropy_terms, na.rm = TRUE)
-  } else {
-    entropy <- colSums(entropy_terms, na.rm = TRUE)
-  }
-
-  return(entropy)
+  entropy
 }
 
 
-
-#' Jensen-Shannon Divergence (Fixed Version)
+#' Jensen-Shannon Divergence
 #'
 #' Computes Jensen-Shannon divergence for genomic data with quality control filters.
 #'
 #' @param indata A data frame with hierarchical column structure (sampling_unit, feature)
-#' @param weights Optional weights for computing weighted averages
+#' @param debug Logical, if TRUE prints debug information
+#' @param compute_MET Logical, if TRUE computes methylation level (MET)
 #' @return A data frame with JSD values and associated statistics
 #' @export
-js_divergence <- function(indata, weights = NULL) {
 
-  if (nrow(indata) == 0) {
-    return(indata)
+
+js_divergence <- function(indata, debug = FALSE, compute_MET = TRUE) {
+  meta_cols <- c("chrom", "start", "end")
+  feature_cols <- setdiff(colnames(indata), meta_cols)
+
+  # Parse sample-feature names (split on last period)
+  split_names <- strsplit(feature_cols, "\\.")
+  sample_ids <- sapply(split_names, function(x) paste(head(x, -1), collapse = "."))
+  features <- sapply(split_names, tail, 1)
+  samples <- unique(sample_ids)
+  feats <- unique(features)
+
+  if (debug) {
+    cat("Feature columns:", feature_cols, "\n")
+    cat("Samples:", samples, "\n")
+    cat("Features:", feats, "\n")
   }
 
-  # Extract sampling unit and feature information from column names
-  col_names <- colnames(indata)
-
-  # Parse hierarchical column structure
-  if (any(grepl("\\.", col_names))) {
-    # Split column names to extract sampling units and features
-    split_names <- strsplit(col_names, "\\.")
-    sampling_units <- sapply(split_names, function(x) x[1])
-    features <- sapply(split_names, function(x) if(length(x) > 1) x[2] else x[1])
-  } else {
-    # If no hierarchical structure, treat each column as a separate unit
-    sampling_units <- col_names
-    features <- rep("feature", length(col_names))
+  # Check for valid features
+  if (length(feats) < 2 || !all(c("mC", "C") %in% feats)) {
+    if (debug) cat("Insufficient or invalid features (need mC and C), returning empty data frame\n")
+    return(data.frame())
   }
 
-  # Create a mapping for sampling units and features
-  unique_units <- unique(sampling_units)
-  unique_features <- unique(features)
+  # Reshape long to array: [positions × samples × features]
+  df_long <- indata %>%
+    pivot_longer(cols = all_of(feature_cols),
+                 names_to = c("sample", "feature"),
+                 names_sep = "\\.(?=[^\\.]+$)", # Split on last period
+                 values_to = "count") %>%
+    mutate(pos_id = paste(chrom, start, end, sep = "_"))
 
-  # Aggregate data by sampling unit
-  count_per_unit <- matrix(0, nrow = nrow(indata), ncol = length(unique_units))
-  colnames(count_per_unit) <- unique_units
-  rownames(count_per_unit) <- rownames(indata)
-
-  for (i in seq_along(unique_units)) {
-    unit_cols <- which(sampling_units == unique_units[i])
-    if (length(unit_cols) > 1) {
-      count_per_unit[, i] <- rowSums(indata[, unit_cols], na.rm = TRUE)
-    } else if (length(unit_cols) == 1) {
-      count_per_unit[, i] <- indata[, unit_cols]
-    }
+  pos_ids <- unique(df_long$pos_id)
+  if (length(pos_ids) == 0) {
+    if (debug) cat("No valid positions, returning empty data frame\n")
+    return(data.frame())
   }
 
-  # Calculate sample size (number of non-null units per position)
-  samplesize <- rowSums(!is.na(count_per_unit) & count_per_unit > 0)
+  count_array <- array(0,
+                       dim = c(length(pos_ids), length(samples), length(feats)),
+                       dimnames = list(pos_id = pos_ids, sample = samples, feature = feats))
 
-  # Quality control filters
-  min_samplesize <- 2
+  for (i in seq_len(nrow(df_long))) {
+    count_array[df_long$pos_id[i], df_long$sample[i], df_long$feature[i]] <- df_long$count[i]
+  }
+
+  # Get mC + C per sample
+  counts_per_sample <- apply(count_array, c(1, 2), sum, na.rm = TRUE)
+
+  # QC filters
   min_count <- 3
+  min_samples <- 2
+  sample_size <- rowSums(counts_per_sample > 0)
+  count_filter <- rowSums(counts_per_sample >= min_count) > 0
+  size_filter <- sample_size >= min_samples
+  keep <- which(count_filter & size_filter)
 
-  count_filter <- apply(count_per_unit >= min_count, 1, any, na.rm = TRUE)
-  samplesize_filter <- (samplesize >= min_samplesize)
-  combined_filter <- (count_filter & samplesize_filter)
-
-  # Apply filters
-  data <- indata[combined_filter, , drop = FALSE]
-
-  if (nrow(data) == 0) {
-    return(data)
+  if (debug) {
+    cat("Sites passing filters:", length(keep), "\n")
+    cat("Sample size summary:", summary(sample_size), "\n")
   }
 
-  data_unit <- count_per_unit[combined_filter, , drop = FALSE]
+  if (length(keep) == 0) return(data.frame())
 
-  # Aggregate by feature
-  data_feature <- matrix(0, nrow = nrow(data), ncol = length(unique_features))
-  colnames(data_feature) <- unique_features
-  rownames(data_feature) <- rownames(data)
+  pos_valid <- pos_ids[keep]
 
-  for (i in seq_along(unique_features)) {
-    feature_cols <- which(features == unique_features[i])
-    if (length(feature_cols) > 1) {
-      data_feature[, i] <- rowSums(data[, feature_cols], na.rm = TRUE)
-    } else if (length(feature_cols) == 1) {
-      data_feature[, i] <- data[, feature_cols]
-    }
+  # Mixture entropy
+  mix_counts <- apply(count_array[pos_valid, , , drop = FALSE], c(1, 3), sum, na.rm = TRUE)
+  if (is.vector(mix_counts) || ncol(mix_counts) < 2) {
+    if (debug) cat("Mix counts has insufficient features or is invalid, returning empty data frame\n")
+    return(data.frame())
   }
+  mix_entropy <- shannon_entropy(mix_counts, axis = 1)
 
-  # Convert to integer
-  data_feature <- matrix(as.integer(data_feature),
-                         nrow = nrow(data_feature),
-                         ncol = ncol(data_feature))
-  colnames(data_feature) <- unique_features
-  rownames(data_feature) <- rownames(data)
+  # Sample-wise entropies
+  entropy_mat <- matrix(0, nrow = length(pos_valid), ncol = length(samples))
+  colnames(entropy_mat) <- samples
+  for (i in seq_along(samples)) {
+    # Extract sample counts for current sample across all positions and features
+    sample_counts <- count_array[pos_valid, i, , drop = FALSE]
 
-  # Calculate mixture entropy 
-  # For each position, calculate entropy across features
-  mix_entropy <- shannon_entropy(data_feature, axis = 1)  # Changed from axis = 2 to axis = 1
+    # Convert to 2D matrix: positions × features
+    sample_counts_2d <- matrix(sample_counts, nrow = length(pos_valid), ncol = length(feats))
+    colnames(sample_counts_2d) <- feats
 
-  # For average entropy, we need to compute entropy for each sampling unit
-  # Initialize matrix to store unit entropies
-  unit_entropies <- matrix(NA, nrow = nrow(data_feature), ncol = ncol(data_unit))
+    # Handle missing values
+    sample_counts_2d[is.na(sample_counts_2d)] <- 0
 
-  for (i in 1:ncol(data_unit)) {
-    # For each sampling unit, calculate the feature distribution
-    unit_data <- matrix(0, nrow = nrow(data_feature), ncol = length(unique_features))
-    colnames(unit_data) <- unique_features
-    rownames(unit_data) <- rownames(data_feature)
+    # Calculate entropy for this sample
+    sample_entropy <- shannon_entropy(sample_counts_2d, axis = 1)
 
-    for (j in seq_along(unique_features)) {
-      feature_cols <- which(features == unique_features[j] & sampling_units == unique_units[i])
-      if (length(feature_cols) > 0) {
-        if (length(feature_cols) > 1) {
-          unit_data[, j] <- rowSums(data[, feature_cols], na.rm = TRUE)
-        } else {
-          unit_data[, j] <- data[, feature_cols]
-        }
-      }
+    # Ensure the entropy vector has the correct length
+    if (length(sample_entropy) != length(pos_valid)) {
+      if (debug) cat(sprintf("Warning: Sample %s entropy length mismatch. Expected %d, got %d\n",
+                             samples[i], length(pos_valid), length(sample_entropy)))
+      sample_entropy <- rep(0, length(pos_valid))
     }
 
-    # Calculate entropy for this unit across all positions
-    # This should return one entropy value per position (row)
-    unit_entropies[, i] <- shannon_entropy(unit_data, axis = 1)  
+    entropy_mat[, i] <- sample_entropy
   }
 
-  # Calculate weighted average entropy
-  # Replace NA values in data_unit with 0 for weighting
-  weights_matrix <- data_unit
-  weights_matrix[is.na(weights_matrix)] <- 0
+  # Sample-wise weights
+  weights <- apply(count_array[pos_valid, , , drop = FALSE], c(1, 2), sum, na.rm = TRUE)
+  total_coverage <- rowSums(weights, na.rm = TRUE)
+  normalized_weights <- weights / total_coverage
+  normalized_weights[is.na(normalized_weights) | is.infinite(normalized_weights)] <- 0
 
-  # Calculate weighted average across units for each position
-  # Ensure both matrices are numeric
-  unit_entropies <- as.matrix(unit_entropies)
-  unit_entropies <- apply(unit_entropies, 2, as.numeric)
+  if (debug) {
+    cat("Mix counts head:", head(mix_counts), "\n")
+    cat("Mix entropy summary:", summary(mix_entropy), "\n")
+    cat("Sample entropy matrix head:", head(entropy_mat), "\n")
+    cat("Weights summary:", summary(normalized_weights), "\n")
+  }
 
-  weights_matrix <- as.matrix(weights_matrix)
-  weights_matrix <- apply(weights_matrix, 2, as.numeric)
+  # Weighted average entropy ⟨H⟩
+  avg_entropy <- rowSums(entropy_mat * normalized_weights, na.rm = TRUE)
 
-  # Compute weighted average across units
-  weighted_sum <- rowSums(unit_entropies * weights_matrix, na.rm = TRUE)
-  weight_totals <- rowSums(weights_matrix, na.rm = TRUE)
-  avg_entropy <- weighted_sum / weight_totals
+  # Convert to bits
+  LOG2E <- 1 / log(2)
+  JSD_bit_ <- round(pmax(LOG2E * (mix_entropy - avg_entropy), 0), 3)
+  HMIX_bit_ <- round(pmin(LOG2E * mix_entropy, 1), 3)
+  samplesize <- sample_size[keep]
 
-  # Handle division by zero
-  avg_entropy[weight_totals == 0 | is.na(weight_totals)] <- 0
+  # Compute mC, C, and MET
+  mc_counts <- apply(count_array[pos_valid, , "mC", drop = FALSE], c(1), sum, na.rm = TRUE)
+  c_counts <- apply(count_array[pos_valid, , "C", drop = FALSE], c(1), sum, na.rm = TRUE)
+  total_counts <- mc_counts + c_counts
+  met <- ifelse(total_counts > 0, mc_counts / total_counts, 0)
+  met <- round(met, 3)
 
-  # Create result data frame
-  div <- data.frame(
-    JSD_bit_ = LOG2E * (mix_entropy - avg_entropy),
-    sample_size = samplesize[combined_filter],
-    HMIX_bit_ = LOG2E * mix_entropy,
-    stringsAsFactors = FALSE
+  # Output table
+  out <- tibble::tibble(
+    `#chrom` = sapply(strsplit(pos_valid, "_"), `[`, 1),
+    start = as.integer(sapply(strsplit(pos_valid, "_"), `[`, 2)),
+    end = as.integer(sapply(strsplit(pos_valid, "_"), `[`, 3)),
+    JSD_bit_ = JSD_bit_,
+    `sample size` = samplesize,
+    HMIX_bit_ = HMIX_bit_,
+    mC = mc_counts,
+    C = c_counts
   )
 
-  # Add feature columns
-  div <- cbind(div, data_feature)
+  if (compute_MET) {
+    out$MET <- met
+  }
 
-  # Round specific columns
-  div$JSD_bit_ <- round(div$JSD_bit_, 3)
-  div$HMIX_bit_ <- round(div$HMIX_bit_, 3)
+  if (debug) {
+    cat("avg_entropy summary:", summary(avg_entropy), "\n")
+    cat("JSD_bit_ summary:", summary(JSD_bit_), "\n")
+    cat("HMIX_bit_ summary:", summary(HMIX_bit_), "\n")
+    cat("mC summary:", summary(mc_counts), "\n")
+    cat("C summary:", summary(c_counts), "\n")
+    if (compute_MET) cat("MET summary:", summary(out$MET), "\n")
+  }
 
-  # Set row names
-  rownames(div) <- rownames(data)
-
-  return(div)
+  return(out)
 }
-
-
-
-
-

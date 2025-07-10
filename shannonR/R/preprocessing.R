@@ -16,7 +16,6 @@ NULL
 #' }
 impute <- function(data, method = "pseudocount") {
   if (method == "pseudocount") {
-    # Given by the parameters of a uninformative Dirichlet prior on the probabilities
     return(1)
   }
   # Add other imputation methods as needed
@@ -31,12 +30,6 @@ impute <- function(data, method = "pseudocount") {
 #' @param fname Original filename
 #' @return Modified filename
 #' @export
-#' @examples
-#' \dontrun{
-#' new_filename <- groupname(by = c("tissue", "condition"),
-#'                          name = c("leaf", "control"),
-#'                          fname = "results.txt")
-#' }
 groupname <- function(by = NULL, name = NULL, fname = NULL) {
   if (is.null(by) || is.null(name) || is.null(fname)) {
     return(fname)
