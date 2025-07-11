@@ -19,8 +19,3 @@ List with reference and qset components
 \description{
 Read metadata and return the population and the quotient set
 }
-\examples{
-\dontrun{
-pop <- population_filter("metadata.txt", subset = "condition == 'treated'")
-}
-}

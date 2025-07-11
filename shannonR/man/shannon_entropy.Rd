@@ -3,19 +3,16 @@
 \name{shannon_entropy}
 \alias{shannon_entropy}
 \title{Shannon Entropy Estimation}
-\usage{
-shannon_entropy(countmatrix, axis = 1, method = "plug-in")
-}
 \arguments{
 \item{countmatrix}{A matrix of counts}
 
 \item{axis}{Integer indicating which axis to compute entropy along (1 for rows, 2 for columns)}
 
-\item{method}{Character string indicating the estimation method (currently only "plug-in" is supported)}
+\item{method}{Character string indicating the estimation method}
 }
 \value{
 A vector of Shannon entropy values
 }
 \description{
-Computes Shannon entropy (in nats) of the feature frequency profile using the plug-in estimator.
+Computes Shannon entropy (in nat) of the feature frequency profile using the plug-in estimator.
 }

@@ -4,16 +4,18 @@
 \alias{js_divergence}
 \title{Jensen-Shannon Divergence}
 \usage{
-js_divergence(indata, weights = NULL)
+js_divergence(indata, debug = FALSE, compute_MET = TRUE)
 }
 \arguments{
-\item{indata}{A data frame with hierarchical column structure (sampling_unit, feature)}
+\item{indata}{Input data frame.}
 
-\item{weights}{Optional weights for computing weighted averages}
+\item{debug}{Logical, whether to print debugging info. Default is FALSE.}
+
+\item{compute_MET}{Logical, whether to compute MET column. Default is TRUE.}
 }
 \value{
-A data frame with JSD values and associated statistics
+A tibble with divergence values.
 }
 \description{
-Computes Jensen-Shannon divergence for genomic data with quality control filters.
+Calculates JSD from methylation count data.
 }

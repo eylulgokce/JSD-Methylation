@@ -19,10 +19,3 @@ Modified filename
 \description{
 Return filename of the subgroup based on grouping criteria
 }
-\examples{
-\dontrun{
-new_filename <- groupname(by = c("tissue", "condition"),
-                         name = c("leaf", "control"),
-                         fname = "results.txt")
-}
-}

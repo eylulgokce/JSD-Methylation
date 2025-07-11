@@ -1,0 +1,124 @@
+* using log directory ‘/Users/eylul/Desktop/JSD-Methylation/shannon.Rcheck’
+* using R version 4.4.2 (2024-10-31)
+* using platform: aarch64-apple-darwin20
+* R was compiled by
+    Apple clang version 14.0.0 (clang-1400.0.29.202)
+    GNU Fortran (GCC) 12.2.0
+* running under: macOS Sequoia 15.5
+* using session charset: UTF-8
+* using options ‘--no-manual --as-cran’
+* checking for file ‘shannon/DESCRIPTION’ ... OK
+* checking extension type ... Package
+* this is package ‘shannon’ version ‘1.0.0’
+* package encoding: UTF-8
+* checking package namespace information ... OK
+* checking package dependencies ... NOTE
+Vignette dependency required without any vignettes:: ‘knitr’
+* checking if this is a source package ... OK
+* checking if there is a namespace ... OK
+* checking for executable files ... OK
+* checking for hidden files and directories ... OK
+* checking for portable file names ... OK
+* checking for sufficient/correct file permissions ... OK
+* checking whether package ‘shannon’ can be installed ... [219s/222s] OK
+* checking installed package size ... OK
+* checking package directory ... OK
+* checking for future file timestamps ... NOTE
+unable to verify current time
+* checking DESCRIPTION meta-information ... OK
+* checking top-level files ... NOTE
+Non-standard files/directories found at top level:
+  ‘corrected_metadata.csv’ ‘output_chr1_r.txt’
+* checking for left-over files ... OK
+* checking index information ... OK
+* checking package subdirectories ... OK
+* checking code files for non-ASCII characters ... OK
+* checking R files for syntax errors ... OK
+* checking whether the package can be loaded ... OK
+* checking whether the package can be loaded with stated dependencies ... OK
+* checking whether the package can be unloaded cleanly ... OK
+* checking whether the namespace can be loaded with stated dependencies ... OK
+* checking whether the namespace can be unloaded cleanly ... OK
+* checking loading without being on the library search path ... OK
+* checking dependencies in R code ... WARNING
+'::' or ':::' import not declared from: ‘tibble’
+Namespaces in Imports field not imported from:
+  ‘BiocGenerics’ ‘GenomicRanges’ ‘IRanges’ ‘Rsamtools’ ‘S4Vectors’
+  ‘data.table’ ‘rtracklayer’
+  All declared Imports should be used.
+* checking S3 generic/method consistency ... OK
+* checking replacement functions ... OK
+* checking foreign function calls ... OK
+* checking R code for possible problems ... NOTE
+bedcount_reader: no visible global function definition for ‘read.table’
+divergence: no visible global function definition for ‘write.table’
+get_data: no visible global function definition for ‘read.table’
+js_divergence : <anonymous>: no visible global function definition for
+  ‘head’
+js_divergence: no visible binding for global variable ‘tail’
+js_divergence: no visible global function definition for ‘%>%’
+js_divergence: no visible global function definition for ‘pivot_longer’
+js_divergence: no visible global function definition for ‘all_of’
+js_divergence: no visible global function definition for ‘mutate’
+js_divergence: no visible binding for global variable ‘chrom’
+js_divergence: no visible binding for global variable ‘start’
+js_divergence: no visible binding for global variable ‘end’
+js_divergence: no visible global function definition for ‘head’
+population_filter: no visible global function definition for
+  ‘read.table’
+Undefined global functions or variables:
+  %>% all_of chrom end head mutate pivot_longer read.table start tail
+  write.table
+Consider adding
+  importFrom("stats", "end", "start")
+  importFrom("utils", "head", "read.table", "tail", "write.table")
+to your NAMESPACE file.
+* checking Rd files ... OK
+* checking Rd metadata ... OK
+* checking Rd line widths ... OK
+* checking Rd cross-references ... OK
+* checking for missing documentation entries ... WARNING
+Undocumented code objects:
+  ‘LOG2E’ ‘meta’
+All user-level objects in a package should have documentation entries.
+See chapter ‘Writing R documentation files’ in the ‘Writing R
+Extensions’ manual.
+* checking for code/documentation mismatches ... WARNING
+Functions or methods with usage in Rd file 'groupby.Rd' but not in code:
+  ‘groupby’
+
+Functions or methods with usage in Rd file 'hello.Rd' but not in code:
+  ‘hello’
+
+Codoc mismatches from Rd file 'js_divergence.Rd':
+js_divergence
+  Code: function(indata, debug = FALSE, compute_MET = TRUE)
+  Docs: function(indata, weights = NULL)
+  Argument names in code not in docs:
+    debug compute_MET
+  Argument names in docs not in code:
+    weights
+  Mismatches in argument names:
+    Position: 2 Code: debug Docs: weights
+
+* checking Rd \usage sections ... OK
+* checking Rd contents ... OK
+* checking for unstated dependencies in examples ... OK
+* checking examples ... ERROR
+Running examples in ‘shannon-Ex.R’ failed
+The error most likely occurred in:
+
+> base::assign(".ptime", proc.time(), pos = "CheckExEnv")
+> ### Name: hello
+> ### Title: Hello, World!
+> ### Aliases: hello
+> 
+> ### ** Examples
+> 
+> hello()
+Error in hello() : could not find function "hello"
+Execution halted
+* checking for non-standard things in the check directory ... OK
+* checking for detritus in the temp directory ... OK
+* DONE
+Status: 1 ERROR, 3 WARNINGs, 4 NOTEs

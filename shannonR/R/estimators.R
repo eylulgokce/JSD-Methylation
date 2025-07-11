@@ -7,7 +7,7 @@
 #' @param method Character string indicating the estimation method
 #' @return A vector of Shannon entropy values
 #' @export
-
+#' @name shannon_entropy
 library(dplyr)
 library(tidyr)
 library(tibble)
@@ -15,6 +15,10 @@ library(tibble)
 shannon_entropy <- function(countmatrix, axis = 1, method = "plug-in") {
   if (method != "plug-in") stop("Only 'plug-in' method is currently supported")
   if (is.null(countmatrix)) stop("Count matrix cannot be NULL")
+
+  if (!is.matrix(countmatrix) && !is.data.frame(countmatrix)) {
+    stop("Input must be a matrix or data frame")
+  }
 
   # Convert to matrix and handle NA
   countmatrix <- as.matrix(countmatrix)
@@ -54,15 +58,14 @@ shannon_entropy <- function(countmatrix, axis = 1, method = "plug-in") {
 
 #' Jensen-Shannon Divergence
 #'
-#' Computes Jensen-Shannon divergence for genomic data with quality control filters.
+#' Calculates JSD from methylation count data.
 #'
-#' @param indata A data frame with hierarchical column structure (sampling_unit, feature)
-#' @param debug Logical, if TRUE prints debug information
-#' @param compute_MET Logical, if TRUE computes methylation level (MET)
-#' @return A data frame with JSD values and associated statistics
+#' @param indata Input data frame.
+#' @param debug Logical, whether to print debugging info. Default is FALSE.
+#' @param compute_MET Logical, whether to compute MET column. Default is TRUE.
+#'
+#' @return A tibble with divergence values.
 #' @export
-
-
 js_divergence <- function(indata, debug = FALSE, compute_MET = TRUE) {
   meta_cols <- c("chrom", "start", "end")
   feature_cols <- setdiff(colnames(indata), meta_cols)
@@ -92,7 +95,8 @@ js_divergence <- function(indata, debug = FALSE, compute_MET = TRUE) {
                  names_to = c("sample", "feature"),
                  names_sep = "\\.(?=[^\\.]+$)", # Split on last period
                  values_to = "count") %>%
-    mutate(pos_id = paste(chrom, start, end, sep = "_"))
+    mutate(pos_id = paste(chrom, start, end, sep = "_"),
+           count = as.numeric(count))
 
   pos_ids <- unique(df_long$pos_id)
   if (length(pos_ids) == 0) {
