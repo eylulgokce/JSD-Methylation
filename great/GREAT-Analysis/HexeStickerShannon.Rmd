@@ -1,0 +1,52 @@
+---
+title: "HexeStickerShannon"
+output: html_document
+---
+
+
+```{r}
+
+library(hexSticker)
+library(magick)
+
+img <- image_read("/Users/eylul/Desktop/JSD-Methylation/great/GREAT-Analysis/inst/figures/formula.png")
+img_transparent <- image_transparent(img, "white")  
+image_write(img_transparent, path = "inst/figures/formula_transparent.png", format = "png")
+
+
+imgurl <- "/Users/eylul/Desktop/JSD-Methylation/great/GREAT-Analysis/inst/figures/formula_transparent.png"
+
+
+sticker(imgurl,
+        package = "shannonR",
+        p_color = "#2c3e50",    
+        p_size = 20,
+        #p_y = 1.5,               
+        s_x = 1,
+        s_y = 0.8,
+        s_width = 0.6,
+        h_fill = "#ecf0f1",     
+        h_color = "#2c3e50", 
+        filename = "inst/figures/shannonR_sticker.png")
+
+
+
+```
+
+
+```{r}
+
+imgurl <- "inst/figures/formula_transparent.png" 
+
+sticker(imgurl,
+        package = "shannonR",
+        p_color = "#d62728",     
+        p_size = 20,
+        s_x = 1,
+        s_y = 0.8,
+        s_width = 0.6,
+        h_fill = "#ffffff",       
+        h_color = "#1f77b4",    
+        filename = "inst/figures/shannonR_blue_red_white.png")
+```
+
